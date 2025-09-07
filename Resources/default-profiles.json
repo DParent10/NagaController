@@ -1,0 +1,27 @@
+{
+  "profiles": {
+    "Default": {
+      "buttons": {
+        "1": {
+          "type": "keySequence",
+          "keys": [
+            { "key": "c", "modifiers": ["cmd"] }
+          ],
+          "description": "Copy"
+        },
+        "2": {
+          "type": "keySequence",
+          "keys": [
+            { "key": "v", "modifiers": ["cmd"] }
+          ],
+          "description": "Paste"
+        }
+      }
+    }
+  },
+  "settings": {
+    "currentProfile": "Default",
+    "autoSwitchProfiles": false,
+    "showNotifications": true
+  }
+}
