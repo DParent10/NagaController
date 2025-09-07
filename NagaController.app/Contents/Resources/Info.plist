@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key>
+	<string>com.example.NagaController</string>
+	<key>CFBundleName</key>
+	<string>NagaController</string>
+	<key>CFBundleExecutable</key>
+	<string>NagaController</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>13.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>NagaController needs to send keyboard events for button remapping.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>NagaController scans for your mouse over Bluetooth to read its battery level.</string>
+</dict>
+</plist>
