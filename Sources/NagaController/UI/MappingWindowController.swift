@@ -10,11 +10,16 @@ final class MappingWindowController: NSWindowController {
         window.title = "NagaController — Button Mappings"
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
+        window.styleMask.insert(.fullSizeContentView)
         if #available(macOS 11.0, *) {
             window.toolbarStyle = .unified
         }
         window.isMovableByWindowBackground = true
-        window.setContentSize(NSSize(width: 560, height: 480))
+        window.setContentSize(NSSize(width: 780, height: 560))
+        window.contentMinSize = NSSize(width: 760, height: 520)
+
+        // Note: Do not wrap vc.view here. MappingViewController already draws a full-size
+        // NSVisualEffectView background. Wrapping again caused a self-subview cycle and hang.
         super.init(window: window)
     }
 

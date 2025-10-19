@@ -47,6 +47,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Popover content
         popover.behavior = .transient
+        if #available(macOS 10.14, *) {
+            popover.appearance = NSAppearance(named: .vibrantDark)
+        }
         popover.contentViewController = MainViewController()
 
         // Notifications (low battery alerts)

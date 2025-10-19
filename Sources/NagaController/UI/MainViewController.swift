@@ -21,6 +21,8 @@ final class MainViewController: NSViewController {
         return label
     }()
 
+    private let batteryGlass = GlassyBatteryView()
+
     private let toggle = NSButton(checkboxWithTitle: "Enable remapping (blocks original keys)", target: nil, action: nil)
     private let configureButton: NSButton = {
         let b = NSButton(title: "Configure mappings…", target: nil, action: nil)
@@ -30,11 +32,34 @@ final class MainViewController: NSViewController {
         return b
     }()
 
+    private let quitButton: NSButton = {
+        let b = NSButton(title: "Quit", target: nil, action: nil)
+        b.image = UIStyle.symbol("power", size: 14, weight: .semibold)
+        b.imagePosition = .imageLeading
+        b.contentTintColor = .systemRed
+        return b
+    }()
+
     private var batteryObserver: NSObjectProtocol?
 
     override func loadView() {
-        self.view = NSView()
+        // Root solid black view for popover content
+        let container = NSView()
+        container.wantsLayer = true
+        container.layer?.cornerRadius = 14
+        container.layer?.masksToBounds = true
+        container.layer?.backgroundColor = NSColor.black.cgColor
+        // Subtle drop shadow
+        container.shadow = NSShadow()
+        container.shadow?.shadowColor = NSColor.black.withAlphaComponent(0.15)
+        container.shadow?.shadowBlurRadius = 20
+        container.shadow?.shadowOffset = NSSize(width: 0, height: -2)
+
+        self.view = container
         self.view.translatesAutoresizingMaskIntoConstraints = false
+        if #available(macOS 10.14, *) {
+            self.view.appearance = NSAppearance(named: .darkAqua)
+        }
 
         let stack = NSStackView()
         stack.orientation = .vertical
@@ -46,11 +71,21 @@ final class MainViewController: NSViewController {
 
         configureButton.target = self
         configureButton.action = #selector(openMappings)
+        UIStyle.stylePrimaryButton(configureButton)
+
+        quitButton.target = self
+        quitButton.action = #selector(quitApp)
+        UIStyle.styleDangerButton(quitButton)
 
         // Initialize from persisted setting
         let enabled = ConfigManager.shared.getRemappingEnabled()
         toggle.state = enabled ? .on : .off
         statusLabel.stringValue = enabled ? "Remapping enabled" : "Listen-only mode"
+        if #available(macOS 10.14, *) {
+            titleLabel.textColor = .white
+            statusLabel.textColor = .white
+            batteryLabel.textColor = .white
+        }
 
         // Controls inside a card
         let controls = NSStackView()
@@ -58,6 +93,17 @@ final class MainViewController: NSViewController {
         controls.spacing = 8
         controls.addArrangedSubview(toggle)
         controls.addArrangedSubview(configureButton)
+        // Battery glass view next to the label
+        let batteryRow = NSStackView()
+        batteryRow.orientation = .horizontal
+        batteryRow.alignment = .centerY
+        batteryRow.spacing = 8
+        batteryGlass.translatesAutoresizingMaskIntoConstraints = false
+        batteryGlass.heightAnchor.constraint(equalToConstant: 10).isActive = true
+        batteryGlass.widthAnchor.constraint(equalToConstant: 60).isActive = true
+        batteryRow.addArrangedSubview(batteryLabel)
+        batteryRow.addArrangedSubview(batteryGlass)
+        controls.addArrangedSubview(quitButton)
 
         let card = UIStyle.makeCard()
         card.contentViewMargins = NSSize(width: 10, height: 10)
@@ -72,7 +118,7 @@ final class MainViewController: NSViewController {
 
         stack.addArrangedSubview(titleLabel)
         stack.addArrangedSubview(statusLabel)
-        stack.addArrangedSubview(batteryLabel)
+        stack.addArrangedSubview(batteryRow)
         stack.addArrangedSubview(card)
 
         view.addSubview(stack)
@@ -102,6 +148,10 @@ final class MainViewController: NSViewController {
         MappingWindowController.shared.show()
     }
 
+    @objc private func quitApp() {
+        NSApp.terminate(nil)
+    }
+
     private func updateBattery() {
         if let level = BatteryMonitor.shared.batteryLevel {
             batteryLabel.stringValue = "Battery: \(level)%"
@@ -110,9 +160,11 @@ final class MainViewController: NSViewController {
             } else {
                 batteryLabel.textColor = .secondaryLabelColor
             }
+            batteryGlass.level = level
         } else {
             batteryLabel.stringValue = "Battery: —"
             batteryLabel.textColor = .secondaryLabelColor
+            batteryGlass.level = nil
         }
     }
 

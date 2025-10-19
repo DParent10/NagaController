@@ -5,12 +5,47 @@ A macOS menu bar app to remap the 12 side buttons of the Razer Naga V2 Hyperspee
 ## Status
 Phase 1: Core EventTap interception and basic mapping with a simple menu bar popover.
 
+## Download (unsigned build)
+- Go to GitHub → Releases and download `NagaController.app.zip` (if available).
+- Unzip and drag `NagaController.app` to `/Applications`.
+- If macOS blocks it, Right‑click → Open (one time), or see Gatekeeper notes below.
+
 ## Build
 - Debug executable: `swift build`
 - Run debug: `.build/debug/NagaController`
 - Release app bundle: `Scripts/build_app.sh` → `NagaController.app`
 
-Grant Accessibility permissions when prompted: System Settings → Privacy & Security → Accessibility.
+## Install and first run
+- Move `NagaController.app` to `/Applications`.
+- Right‑click → Open the first time to bypass Gatekeeper for unsigned builds.
+- Click the menu bar icon → turn ON “Enable remapping”.
+- Open “Configure mappings…” to set actions for buttons 1–12.
+
+## Permissions
+- Accessibility: System Settings → Privacy & Security → Accessibility → enable “NagaController”.
+- Bluetooth (battery): System Settings → Privacy & Security → Bluetooth → allow “NagaController”.
+- Tip: Always launch the same `.app` you granted (avoid running a different debug binary) so permissions persist.
+
+### Gatekeeper notes (unsigned builds)
+- If you see “can’t be opened because Apple cannot check it for malicious software”:
+  - Right‑click the app → Open → Open.
+  - Or System Settings → Privacy & Security → “Open Anyway”.
+  - Or remove quarantine in Terminal:
+    ```bash
+    xattr -dr com.apple.quarantine /Applications/NagaController.app
+    ```
+
+## Distribute via GitHub (no developer account)
+- Build a release app:
+  ```bash
+  bash Scripts/build_app.sh
+  ```
+- Zip the app for sharing:
+  ```bash
+  ditto -c -k --sequesterRsrc --keepParent NagaController.app NagaController.app.zip
+  ```
+- Create a GitHub Release and attach `NagaController.app.zip`.
+- Users can download, unzip, move to `/Applications`, and use the Gatekeeper steps above.
 
 ## Structure
 - `Sources/NagaController/` — App source code (Swift + AppKit)
