@@ -1,5 +1,6 @@
 import Cocoa
 import UniformTypeIdentifiers
+import QuartzCore
 
 final class MappingViewController: NSViewController {
     private let headerLabel: NSTextField = {
@@ -11,30 +12,43 @@ final class MappingViewController: NSViewController {
     private let profilePopup: NSPopUpButton = NSPopUpButton(frame: .zero, pullsDown: false)
     private let managePopup: NSPopUpButton = NSPopUpButton(frame: .zero, pullsDown: true)
     private let saveButton: NSButton = NSButton(title: "Save", target: nil, action: nil)
-    private let stack = NSStackView()
+    private let stack = NSStackView() // unused legacy
+    private var grid: NSGridView?
 
     private var rowViews: [Int: NSView] = [:]
     private var descLabels: [Int: NSTextField] = [:]
+    private var container: NSStackView!
+    private var topConstraint: NSLayoutConstraint?
+    private var backgroundGradient: CAGradientLayer?
 
     override func loadView() {
         self.view = NSView()
         self.view.translatesAutoresizingMaskIntoConstraints = false
+        if #available(macOS 10.14, *) { self.view.appearance = NSAppearance(named: .darkAqua) }
 
-        // Background effect for a modern look
-        let effect = NSVisualEffectView()
-        effect.blendingMode = .behindWindow
-        if #available(macOS 10.14, *) {
-            effect.material = .sidebar
-        }
-        effect.state = .active
-        effect.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(effect)
+        // Solid black background container
+        let background = NSView()
+        background.translatesAutoresizingMaskIntoConstraints = false
+        background.wantsLayer = true
+        background.layer?.backgroundColor = NSColor.black.cgColor
+        view.addSubview(background)
         NSLayoutConstraint.activate([
-            effect.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            effect.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            effect.topAnchor.constraint(equalTo: view.topAnchor),
-            effect.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            background.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            background.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            background.topAnchor.constraint(equalTo: view.topAnchor),
+            background.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
+
+        // Subtle razer-green gradient tint over black
+        let grad = CAGradientLayer()
+        grad.colors = [
+            UIStyle.razerGreen.withAlphaComponent(0.10).cgColor,
+            NSColor.clear.cgColor
+        ]
+        grad.startPoint = CGPoint(x: 0.0, y: 1.0)
+        grad.endPoint = CGPoint(x: 1.0, y: 0.0)
+        background.layer?.insertSublayer(grad, at: 0)
+        backgroundGradient = grad
 
         // Top bar with profile selector and save button
         let topBar = NSStackView()
@@ -44,6 +58,7 @@ final class MappingViewController: NSViewController {
         topBar.spacing = 8
 
         let profileLabel = NSTextField(labelWithString: "Profile:")
+        profileLabel.textColor = .white
         profilePopup.target = self
         profilePopup.action = #selector(profileChanged(_:))
         reloadProfilesPopup()
@@ -56,6 +71,7 @@ final class MappingViewController: NSViewController {
         saveButton.image = UIStyle.symbol("tray.and.arrow.down", size: 14, weight: .semibold)
         saveButton.imagePosition = .imageLeading
         saveButton.toolTip = "Save all changes to disk"
+        UIStyle.stylePrimaryButton(saveButton)
 
         topBar.addArrangedSubview(headerLabel)
         topBar.addArrangedSubview(NSView()) // spacer
@@ -64,48 +80,105 @@ final class MappingViewController: NSViewController {
         topBar.addArrangedSubview(managePopup)
         topBar.addArrangedSubview(saveButton)
 
-        // Rows for 1..12 inside a "card"
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 10
-        stack.edgeInsets = NSEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
+        // (Removed mouse visualization)
 
-        for idx in 1...12 {
-            let row = makeRow(for: idx)
-            rowViews[idx] = row
-            stack.addArrangedSubview(row)
+        // Three equal-width columns of cards (1,4,7,10 | 2,5,8,11 | 3,6,9,12)
+        let col1 = NSStackView(); col1.orientation = .vertical; col1.spacing = 12
+        let col2 = NSStackView(); col2.orientation = .vertical; col2.spacing = 12
+        let col3 = NSStackView(); col3.orientation = .vertical; col3.spacing = 12
+
+        for idx in stride(from: 1, through: 10, by: 3) {
+            let v = makeCard(for: idx); rowViews[idx] = v; col1.addArrangedSubview(v)
+        }
+        for idx in stride(from: 2, through: 11, by: 3) {
+            let v = makeCard(for: idx); rowViews[idx] = v; col2.addArrangedSubview(v)
+        }
+        for idx in stride(from: 3, through: 12, by: 3) {
+            let v = makeCard(for: idx); rowViews[idx] = v; col3.addArrangedSubview(v)
         }
 
-        // Card container for rows
-        let card = UIStyle.makeCard()
-        card.contentViewMargins = NSSize(width: 8, height: 8)
-        card.addSubview(stack)
-        stack.translatesAutoresizingMaskIntoConstraints = false
+        let columns = NSStackView(views: [col1, col2, col3])
+        columns.orientation = .horizontal
+        columns.spacing = 12
+        columns.distribution = .fillEqually
+        columns.translatesAutoresizingMaskIntoConstraints = false
+
+        // Card container for columns
+        let cardsCard = UIStyle.makeCard()
+        cardsCard.contentViewMargins = NSSize(width: 10, height: 10)
+        cardsCard.addSubview(columns)
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 8),
-            stack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -8),
-            stack.topAnchor.constraint(equalTo: card.topAnchor, constant: 8),
-            stack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -8)
+            columns.leadingAnchor.constraint(equalTo: cardsCard.leadingAnchor, constant: 10),
+            columns.trailingAnchor.constraint(equalTo: cardsCard.trailingAnchor, constant: -10),
+            columns.topAnchor.constraint(equalTo: cardsCard.topAnchor, constant: 10),
+            columns.bottomAnchor.constraint(equalTo: cardsCard.bottomAnchor, constant: -10)
         ])
 
-        let container = NSStackView()
+        // Main content area: just the mapping cards (3 columns)
+        let content = cardsCard
+
+        container = NSStackView()
         container.orientation = .vertical
         container.spacing = 12
         container.edgeInsets = NSEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
         container.addArrangedSubview(topBar)
-        container.addArrangedSubview(NSBox())
-        container.addArrangedSubview(card)
+        container.addArrangedSubview(NSBox()) // separator
+        container.addArrangedSubview(content)
 
         view.addSubview(container)
         container.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             container.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             container.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            container.topAnchor.constraint(equalTo: view.topAnchor),
             container.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
+        // Temporary top constraint to view; will re-anchor to window's contentLayoutGuide in viewDidAppear
+        topConstraint = container.topAnchor.constraint(equalTo: view.topAnchor)
+        topConstraint?.isActive = true
 
         refreshRows()
+    }
+
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        // After the view is attached to a window, move the top to the window's contentLayoutGuide
+        if let guide = view.window?.contentLayoutGuide as? NSLayoutGuide {
+            topConstraint?.isActive = false
+            topConstraint = container.topAnchor.constraint(equalTo: guide.topAnchor, constant: 8)
+            topConstraint?.isActive = true
+        }
+    }
+
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        if let grad = backgroundGradient, let host = view.subviews.first as? NSVisualEffectView {
+            grad.frame = host.bounds
+        }
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        guard let card = event.trackingArea?.userInfo?["card"] as? NSView else { return }
+        highlight(card: card, on: true)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        guard let card = event.trackingArea?.userInfo?["card"] as? NSView else { return }
+        highlight(card: card, on: false)
+    }
+
+    private func highlight(card: NSView, on: Bool) {
+        guard let layer = card.layer else { return }
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.2
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            layer.borderWidth = on ? 2.0 : 0.5
+            layer.borderColor = on ? UIStyle.razerGreen.withAlphaComponent(0.9).cgColor : NSColor.white.withAlphaComponent(0.18).cgColor
+            layer.shadowOpacity = on ? 0.25 : 0.0
+            layer.shadowRadius = on ? 12 : 0
+            layer.shadowColor = UIStyle.razerGreen.withAlphaComponent(0.6).cgColor
+            layer.shadowOffset = CGSize(width: 0, height: 0)
+            layer.transform = on ? CATransform3DMakeScale(1.02, 1.02, 1) : CATransform3DIdentity
+        }
     }
 
     private func reloadProfilesPopup() {
@@ -148,27 +221,42 @@ final class MappingViewController: NSViewController {
         return item
     }
 
-    private func makeRow(for index: Int) -> NSView {
-        let h = NSStackView()
-        h.orientation = .horizontal
-        h.alignment = .centerY
-        h.spacing = 8
+    private func makeCard(for index: Int) -> NSView {
+        let card = UIStyle.makeCard()
+        card.translatesAutoresizingMaskIntoConstraints = false
 
-        let label = NSTextField(labelWithString: "Button \(index)")
-        label.font = .systemFont(ofSize: 13, weight: .medium)
+        // Vertical content stack inside card
+        let v = NSStackView()
+        v.orientation = .vertical
+        v.spacing = 6
+        v.translatesAutoresizingMaskIntoConstraints = false
+
+        // Title row with big button number and profile-colored accent
+        let title = NSTextField(labelWithString: "Button \(index)")
+        title.font = .systemFont(ofSize: 14, weight: .semibold)
+        title.textColor = .white
+
         let desc = NSTextField(labelWithString: "")
         desc.lineBreakMode = .byTruncatingTail
-        desc.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        desc.textColor = .white
+
+        let buttonRow = NSStackView()
+        buttonRow.orientation = .horizontal
+        buttonRow.alignment = .centerY
+        buttonRow.spacing = 8
 
         let edit = NSButton(title: "Edit…", target: nil, action: nil)
+        edit.bezelStyle = .rounded
         edit.image = UIStyle.symbol("pencil", size: 13, weight: .regular)
         edit.imagePosition = .imageLeading
         edit.toolTip = "Edit button \(index) action"
         edit.tag = index
         edit.target = self
         edit.action = #selector(editTapped(_:))
+        UIStyle.stylePrimaryButton(edit)
 
         let clear = NSButton(title: "Clear", target: nil, action: nil)
+        clear.bezelStyle = .rounded
         clear.image = UIStyle.symbol("trash", size: 13, weight: .regular)
         clear.imagePosition = .imageLeading
         clear.contentTintColor = .systemRed
@@ -176,19 +264,35 @@ final class MappingViewController: NSViewController {
         clear.tag = index
         clear.target = self
         clear.action = #selector(clearTapped(_:))
+        UIStyle.styleSecondaryButton(clear)
 
-        h.addArrangedSubview(label)
-        h.addArrangedSubview(NSBox()) // spacer
-        h.addArrangedSubview(desc)
-        h.addArrangedSubview(edit)
-        h.addArrangedSubview(clear)
+        buttonRow.addArrangedSubview(edit)
+        buttonRow.addArrangedSubview(clear)
 
-        h.translatesAutoresizingMaskIntoConstraints = false
-        h.widthAnchor.constraint(equalToConstant: 520).isActive = true
+        v.addArrangedSubview(title)
+        v.addArrangedSubview(desc)
+        v.addArrangedSubview(buttonRow)
+
+        card.addSubview(v)
+        NSLayoutConstraint.activate([
+            v.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 10),
+            v.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -10),
+            v.topAnchor.constraint(equalTo: card.topAnchor, constant: 10),
+            v.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -10)
+        ])
+
+        // Hover glow for card
+        addHover(to: card)
 
         // Store desc label for later refresh
         descLabels[index] = desc
-        return h
+        return card
+    }
+
+    private func addHover(to view: NSView) {
+        view.wantsLayer = true
+        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect], owner: self, userInfo: ["card": view])
+        view.addTrackingArea(area)
     }
 
     private func refreshRows() {
