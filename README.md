@@ -103,3 +103,9 @@ Phase 1: Core EventTap interception and basic mapping with a simple menu bar pop
 - Ensure the device is connected over Bluetooth (not via the HyperSpeed dongle).
 - Wake the mouse (move/click) and re-open the popover.
 - Launch from Terminal to see BLE diagnostics.
+
+## Download
+
+**[⬇️ Download Latest Release (v0.1.0)](https://github.com/DParent10/NagaController/releases/latest)**
+
+Pre-release version with core functionality. See [Release Notes](https://github.com/DParent10/NagaController/releases) for installation instructions.
