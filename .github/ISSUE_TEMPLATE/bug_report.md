@@ -1,15 +1,10 @@
 ---
 name: Bug report
-about: Create a report to help us improve
+about: Report an issue with NagaController
 title: ''
 labels: ''
 assignees: ''
 
----
-
----
-name: Bug Report
-about: Report an issue with NagaController
 ---
 
 **Describe the issue:**
