@@ -60,3 +60,9 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+
+# DMG build artifacts
+dmg-assets/*.dmg
+dmg-assets/*.icns
+dmg-assets/rw.*.dmg
+dmg-assets/temp.dmg
