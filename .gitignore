@@ -66,3 +66,5 @@ dmg-assets/*.dmg
 dmg-assets/*.icns
 dmg-assets/rw.*.dmg
 dmg-assets/temp.dmg
+.DS_Store
+.build/
