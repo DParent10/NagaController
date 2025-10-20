@@ -12,7 +12,7 @@ final class HIDListener {
     private var recentPressTimestamps: [Int: TimeInterval] = [:]
     // Consider a HID press "recent" within this time window (seconds)
     // Increased to account for scheduling/processing latency between HID and event tap
-    private let recentWindow: TimeInterval = 0.60
+    private let recentWindow: TimeInterval = 1.00
 
     private init() {
         manager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))

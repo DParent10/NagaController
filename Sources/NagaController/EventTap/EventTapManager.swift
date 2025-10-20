@@ -1,5 +1,6 @@
 import Cocoa
 import ApplicationServices
+import Darwin
 
 final class EventTapManager {
     static let shared = EventTapManager()
@@ -32,16 +33,31 @@ final class EventTapManager {
             (1 << CGEventType.keyUp.rawValue)
         )
 
-        let options: CGEventTapOptions = listenOnly ? .listenOnly : .defaultTap
+        var options: CGEventTapOptions = listenOnly ? .listenOnly : .defaultTap
 
-        guard let tap = CGEvent.tapCreate(
+        var tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
             options: options,
             eventsOfInterest: CGEventMask(mask),
             callback: EventTapManager.eventCallback,
             userInfo: UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
-        ) else {
+        )
+        if tap == nil && !listenOnly {
+            NSLog("[EventTap] Failed to create blocking event tap; falling back to listen-only. Enable Input Monitoring in System Settings.")
+            options = .listenOnly
+            tap = CGEvent.tapCreate(
+                tap: .cgSessionEventTap,
+                place: .headInsertEventTap,
+                options: options,
+                eventsOfInterest: CGEventMask(mask),
+                callback: EventTapManager.eventCallback,
+                userInfo: UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
+            )
+            isListeningOnly = true
+            DispatchQueue.main.async { [weak self] in self?.promptForInputMonitoring() }
+        }
+        guard let tap = tap else {
             NSLog("[EventTap] Failed to create event tap. Check permissions.")
             return
         }
@@ -92,11 +108,16 @@ final class EventTapManager {
                 }
                 NSLog("[EventTap] Detected Naga button \(buttonIndex) (keyCode=\(keyCode)).")
                 if !manager.isListeningOnly {
-                    // Only remap/block if this keyDown correlates with a recent HID press
-                    if HIDListener.shared.wasRecentPress(buttonIndex: buttonIndex) {
+                    var recent = HIDListener.shared.wasRecentPress(buttonIndex: buttonIndex)
+                    if !recent {
+                        for _ in 0..<5 {
+                            usleep(2000)
+                            if HIDListener.shared.wasRecentPress(buttonIndex: buttonIndex) { recent = true; break }
+                        }
+                    }
+                    if recent {
                         ButtonMapper.shared.handlePress(buttonIndex: buttonIndex)
                         manager.activeDownButtons.insert(buttonIndex)
-                        // Block original event by returning nil
                         return nil
                     }
                 }
@@ -113,5 +134,20 @@ final class EventTapManager {
         }
 
         return Unmanaged.passUnretained(event)
+    }
+
+    private func promptForInputMonitoring() {
+        let alert = NSAlert()
+        alert.messageText = "Enable Input Monitoring"
+        alert.informativeText = "To block the original number keys, enable Input Monitoring for NagaController in System Settings → Privacy & Security → Input Monitoring."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Open Settings")
+        alert.addButton(withTitle: "Cancel")
+        let res = alert.runModal()
+        if res == .alertFirstButtonReturn {
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
+                NSWorkspace.shared.open(url)
+            }
+        }
     }
 }
