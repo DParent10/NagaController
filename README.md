@@ -1,5 +1,7 @@
 # NagaController
 
+[![GitHub stars](https://img.shields.io/github/stars/DParent10/NagaController?style=social)](https://github.com/DParent10/NagaController)
+
 A macOS menu bar app to remap the 12 side buttons of the Razer Naga V2 Hyperspeed. Intercepts the default 1-0-=- key events and maps them to actions like key sequences, app launching, and macros.
 
 ## Status
