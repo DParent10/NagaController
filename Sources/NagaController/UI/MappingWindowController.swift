@@ -1,7 +1,8 @@
 import Cocoa
 
-final class MappingWindowController: NSWindowController {
+final class MappingWindowController: NSWindowController, NSWindowDelegate {
     static let shared = MappingWindowController()
+    private var previousActivationPolicy: NSApplication.ActivationPolicy?
 
     private init() {
         let vc = MappingViewController()
@@ -17,6 +18,7 @@ final class MappingWindowController: NSWindowController {
         window.isMovableByWindowBackground = true
         window.setContentSize(NSSize(width: 780, height: 560))
         window.contentMinSize = NSSize(width: 760, height: 520)
+        window.isReleasedWhenClosed = false
 
         // Note: Do not wrap vc.view here. MappingViewController already draws a full-size
         // NSVisualEffectView background. Wrapping again caused a self-subview cycle and hang.
@@ -27,8 +29,25 @@ final class MappingWindowController: NSWindowController {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     func show() {
-        self.window?.center()
-        self.showWindow(nil)
+        guard let window else { return }
+
+        previousActivationPolicy = nil
+        let currentPolicy = NSApp.activationPolicy()
+        if currentPolicy != .regular {
+            previousActivationPolicy = currentPolicy
+            NSApp.setActivationPolicy(.regular)
+        }
+
+        window.delegate = self
+        window.center()
+        showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        if let previous = previousActivationPolicy {
+            NSApp.setActivationPolicy(previous)
+            previousActivationPolicy = nil
+        }
     }
 }

@@ -3,17 +3,31 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="$PROJECT_ROOT/.build"
+SCRATCH_DIR="$(mktemp -d /tmp/naga-build-XXXXXX)"
 APP_NAME="NagaController"
 APP_BUNDLE="$PROJECT_ROOT/$APP_NAME.app"
-EXECUTABLE_PATH="$BUILD_DIR/release/$APP_NAME"
+EXECUTABLE_PATH="$SCRATCH_DIR/release/$APP_NAME"
 
-# Clean build cache (helps when build.db is corrupted)
-swift package --package-path "$PROJECT_ROOT" clean || true
+cleanup() {
+  rm -rf "$SCRATCH_DIR"
+}
+trap cleanup EXIT
+
+echo "Cleaning previous build artifacts..."
 rm -rf "$BUILD_DIR" || true
+swift package --package-path "$PROJECT_ROOT" clean >/dev/null 2>&1 || true
 
+echo "Building for production..."
 # Build release executable
-swift build -c release --package-path "$PROJECT_ROOT"
+swift build -c release --package-path "$PROJECT_ROOT" --scratch-path "$SCRATCH_DIR"
 
+# Verify the executable was actually built
+if [[ ! -f "$EXECUTABLE_PATH" ]]; then
+  echo "❌ Error: Build failed - executable not found at $EXECUTABLE_PATH"
+  exit 1
+fi
+
+echo "Creating app bundle..."
 # Create app bundle structure
 rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_BUNDLE/Contents/MacOS"
@@ -21,7 +35,8 @@ mkdir -p "$APP_BUNDLE/Contents/Resources/Icons"
 
 # Copy executable and resources
 cp "$EXECUTABLE_PATH" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
-cp -R "$PROJECT_ROOT/Resources/"* "$APP_BUNDLE/Contents/Resources/" || true
+chmod +x "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
+cp -R "$PROJECT_ROOT/Resources/"* "$APP_BUNDLE/Contents/Resources/" 2>/dev/null || true
 
 # Create/merge Info.plist
 if [[ -f "$PROJECT_ROOT/Resources/Info.plist" ]]; then
@@ -55,11 +70,14 @@ else
 PLIST
 fi
 
+echo "Code signing..."
 # Ad-hoc codesign (helps TCC and launching)
-codesign --force --deep --sign - "$APP_BUNDLE" || true
+codesign --force --deep --sign - "$APP_BUNDLE" 2>/dev/null || true
 
 # Remove quarantine attributes if present
-xattr -dr com.apple.quarantine "$APP_BUNDLE" || true
+xattr -dr com.apple.quarantine "$APP_BUNDLE" 2>/dev/null || true
 
-# Done
-echo "Built: $APP_BUNDLE"
+echo "✅ Build successful!"
+echo "📦 App bundle: $APP_BUNDLE"
+echo ""
+echo "To run: open $APP_BUNDLE"

@@ -53,7 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover.contentViewController = MainViewController()
 
         // Notifications (low battery alerts)
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        requestNotificationAuthorizationIfPossible()
 
         // Observe battery updates
         batteryObserver = NotificationCenter.default.addObserver(forName: BatteryMonitor.didUpdateNotification, object: nil, queue: .main) { [weak self] _ in
@@ -76,6 +76,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if popover.isShown {
             popover.performClose(sender)
         } else {
+            if let mainVC = popover.contentViewController as? MainViewController {
+                mainVC.refreshPermissionStatuses()
+            }
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         }
     }
@@ -107,5 +110,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             button.title = hasImage ? "" : "🖱️"
             button.toolTip = "Naga battery: —"
         }
+    }
+
+    private func requestNotificationAuthorizationIfPossible() {
+        guard Bundle.main.bundleIdentifier != nil else {
+            NSLog("[Notifications] Skipping authorization; bundle identifier missing (likely running via swift run).")
+            return
+        }
+
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 }

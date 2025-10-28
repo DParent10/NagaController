@@ -151,7 +151,7 @@ final class MappingViewController: NSViewController {
 
     override func viewDidLayout() {
         super.viewDidLayout()
-        if let grad = backgroundGradient, let host = view.subviews.first as? NSVisualEffectView {
+        if let grad = backgroundGradient, let host = view.subviews.first {
             grad.frame = host.bounds
         }
     }

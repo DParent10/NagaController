@@ -7,6 +7,17 @@ set -e
 
 echo "🎨 Setting up NagaController icon and DMG background..."
 
+# Get the project root (parent of dmg-assets)
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+APP_BUNDLE="$PROJECT_ROOT/NagaController.app"
+
+# Check if app bundle exists
+if [ ! -d "$APP_BUNDLE" ]; then
+    echo "❌ Error: NagaController.app not found!"
+    echo "Please build the app first: bash Scripts/build_app.sh"
+    exit 1
+fi
+
 # Check if icon file exists
 if [ ! -f "AppIcon.png" ]; then
     echo "❌ Error: AppIcon.png not found!"
@@ -40,11 +51,12 @@ echo "🔨 Converting to .icns format..."
 iconutil -c icns AppIcon.iconset -o AppIcon.icns
 
 echo "📁 Installing icon into app bundle..."
-cp AppIcon.icns NagaController.app/Contents/Resources/AppIcon.icns
+mkdir -p "$APP_BUNDLE/Contents/Resources"
+cp AppIcon.icns "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
 
 # Update Info.plist
-/usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AppIcon" NagaController.app/Contents/Info.plist 2>/dev/null || \
-/usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" NagaController.app/Contents/Info.plist
+/usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AppIcon" "$APP_BUNDLE/Contents/Info.plist" 2>/dev/null || \
+/usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "$APP_BUNDLE/Contents/Info.plist"
 
 echo "✅ App icon installed!"
 rm -rf AppIcon.iconset
@@ -53,14 +65,12 @@ echo ""
 echo "🎨 Creating DMG with custom background..."
 
 # Sign the app first
-codesign --force --deep --sign "Developer ID Application: Devin Parent (SUT6Y24T2J)" --options runtime NagaController.app
+codesign --force --deep --sign "Developer ID Application: Devin Parent (SUT6Y24T2J)" --options runtime "$APP_BUNDLE"
 
 # Remove old DMG if exists
-rm -f NagaController-v0.1.0.dmg
+rm -f "$PROJECT_ROOT/NagaController-v0.1.0.dmg"
 
 # Create DMG
-# Note: Your embedded text in dmg-background.png will be the primary labels
-# Finder labels may still appear but will be secondary/redundant
 create-dmg \
   --volname "NagaController" \
   --volicon "AppIcon.icns" \
@@ -72,13 +82,13 @@ create-dmg \
   --hide-extension "NagaController.app" \
   --app-drop-link 480 170 \
   --no-internet-enable \
-  "NagaController-v0.1.0.dmg" \
-  "NagaController.app" || {
+  "$PROJECT_ROOT/NagaController-v0.1.0.dmg" \
+  "$APP_BUNDLE" || {
     echo "Note: create-dmg may show errors but often succeeds anyway"
   }
 
 # Check if DMG was created
-if [ ! -f "NagaController-v0.1.0.dmg" ]; then
+if [ ! -f "$PROJECT_ROOT/NagaController-v0.1.0.dmg" ]; then
     echo "❌ DMG creation failed"
     exit 1
 fi
@@ -88,20 +98,17 @@ echo ""
 echo "🔐 Signing and notarizing DMG..."
 
 # Sign the DMG
-codesign --sign "Developer ID Application: Devin Parent (SUT6Y24T2J)" NagaController-v0.1.0.dmg
+codesign --sign "Developer ID Application: Devin Parent (SUT6Y24T2J)" "$PROJECT_ROOT/NagaController-v0.1.0.dmg"
 
 # Notarize the DMG
 echo "Submitting for notarization (this may take a few minutes)..."
-xcrun notarytool submit NagaController-v0.1.0.dmg --keychain-profile "notary-profile" --wait
+xcrun notarytool submit "$PROJECT_ROOT/NagaController-v0.1.0.dmg" --keychain-profile "notary-profile" --wait
 
 # Staple the notarization
-xcrun stapler staple NagaController-v0.1.0.dmg
+xcrun stapler staple "$PROJECT_ROOT/NagaController-v0.1.0.dmg"
 
 echo ""
 echo "✅ Done! Your signed and notarized DMG is ready:"
-echo "   📦 NagaController-v0.1.0.dmg"
-echo ""
-echo "Your embedded text in the background will be the primary visual."
-echo "Finder may still show small labels, but your styled text will stand out!"
+echo "   📦 $PROJECT_ROOT/NagaController-v0.1.0.dmg"
 echo ""
 echo "Test it: open NagaController-v0.1.0.dmg"
