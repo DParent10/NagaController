@@ -114,8 +114,35 @@ final class MappingViewController: NSViewController {
             columns.bottomAnchor.constraint(equalTo: cardsCard.bottomAnchor, constant: -10)
         ])
 
-        // Main content area: just the mapping cards (3 columns)
-        let content = cardsCard
+        let dpiStack = NSStackView()
+        dpiStack.orientation = .vertical
+        dpiStack.spacing = 12
+        dpiStack.translatesAutoresizingMaskIntoConstraints = false
+        for idx in [13, 14] {
+            let card = makeCard(for: idx)
+            rowViews[idx] = card
+            dpiStack.addArrangedSubview(card)
+        }
+
+        let extrasCard = UIStyle.makeCard()
+        extrasCard.contentViewMargins = NSSize(width: 10, height: 10)
+        extrasCard.addSubview(dpiStack)
+        NSLayoutConstraint.activate([
+            dpiStack.leadingAnchor.constraint(equalTo: extrasCard.leadingAnchor, constant: 10),
+            dpiStack.trailingAnchor.constraint(equalTo: extrasCard.trailingAnchor, constant: -10),
+            dpiStack.topAnchor.constraint(equalTo: extrasCard.topAnchor, constant: 10),
+            dpiStack.bottomAnchor.constraint(equalTo: extrasCard.bottomAnchor, constant: -10)
+        ])
+
+        let contentStack = NSStackView()
+        contentStack.orientation = .vertical
+        contentStack.spacing = 12
+        contentStack.translatesAutoresizingMaskIntoConstraints = false
+        contentStack.addArrangedSubview(cardsCard)
+        contentStack.addArrangedSubview(extrasCard)
+
+        // Main content area: mapping cards plus DPI buttons
+        let content = contentStack
 
         container = NSStackView()
         container.orientation = .vertical
@@ -232,7 +259,7 @@ final class MappingViewController: NSViewController {
         v.translatesAutoresizingMaskIntoConstraints = false
 
         // Title row with big button number and profile-colored accent
-        let title = NSTextField(labelWithString: "Button \(index)")
+        let title = NSTextField(labelWithString: displayName(for: index))
         title.font = .systemFont(ofSize: 14, weight: .semibold)
         title.textColor = .white
 
@@ -249,7 +276,7 @@ final class MappingViewController: NSViewController {
         edit.bezelStyle = .rounded
         edit.image = UIStyle.symbol("pencil", size: 13, weight: .regular)
         edit.imagePosition = .imageLeading
-        edit.toolTip = "Edit button \(index) action"
+        edit.toolTip = "Edit mapping for \(displayName(for: index))"
         edit.tag = index
         edit.target = self
         edit.action = #selector(editTapped(_:))
@@ -260,7 +287,7 @@ final class MappingViewController: NSViewController {
         clear.image = UIStyle.symbol("trash", size: 13, weight: .regular)
         clear.imagePosition = .imageLeading
         clear.contentTintColor = .systemRed
-        clear.toolTip = "Clear mapping for button \(index)"
+        clear.toolTip = "Clear mapping for \(displayName(for: index))"
         clear.tag = index
         clear.target = self
         clear.action = #selector(clearTapped(_:))
@@ -289,6 +316,14 @@ final class MappingViewController: NSViewController {
         return card
     }
 
+    private func displayName(for index: Int) -> String {
+        switch index {
+        case 13: return "DPI Up"
+        case 14: return "DPI Down"
+        default: return "Button \(index)"
+        }
+    }
+
     private func addHover(to view: NSView) {
         view.wantsLayer = true
         let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect], owner: self, userInfo: ["card": view])
@@ -297,7 +332,7 @@ final class MappingViewController: NSViewController {
 
     private func refreshRows() {
         let mapping = ConfigManager.shared.mappingForCurrentProfile()
-        for i in 1...12 {
+        for i in 1...14 {
             descLabels[i]?.stringValue = actionDescription(mapping[i])
         }
         headerLabel.stringValue = "Button Mappings — \(ConfigManager.shared.currentProfileName)"

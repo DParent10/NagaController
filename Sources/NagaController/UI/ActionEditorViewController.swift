@@ -52,6 +52,11 @@ final class ActionEditorViewController: NSViewController {
         descriptionField.placeholderString = "e.g. Copy"
 
         // Key UI
+        keyField.translatesAutoresizingMaskIntoConstraints = false
+        keyField.widthAnchor.constraint(greaterThanOrEqualToConstant: 80).isActive = true
+        keyField.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        keyField.setContentCompressionResistancePriority(.required, for: .horizontal)
+
         let keyRow = NSStackView(views: [NSTextField(labelWithString: "Key:"), keyField, NSView()])
         keyRow.spacing = 8
         let modsRow = NSStackView(views: [NSTextField(labelWithString: "Modifiers:"), modCmd, modAlt, modCtrl, modShift, NSView()])
