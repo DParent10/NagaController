@@ -25,6 +25,7 @@ struct ButtonAction: Codable {
     let description: String?
     let path: String? // for application
     let command: String? // for systemCommand
+    let text: String? // for textSnippet
     let steps: [MacroStep]? // for macro
     let profile: String? // for profileSwitch
 }
@@ -213,6 +214,9 @@ final class ConfigManager {
         case "systemCommand":
             if let cmd = action.command { return .systemCommand(command: cmd, description: action.description) }
             return nil
+        case "textSnippet":
+            if let text = action.text { return .textSnippet(text: text, description: action.description) }
+            return nil
         case "macro":
             return .macro(steps: action.steps ?? [], description: action.description)
         case "profileSwitch":
@@ -226,15 +230,17 @@ final class ConfigManager {
     private func toButtonAction(_ action: ActionType) -> ButtonAction {
         switch action {
         case .keySequence(let keys, let description):
-            return ButtonAction(type: "keySequence", keys: keys, description: description, path: nil, command: nil, steps: nil, profile: nil)
+            return ButtonAction(type: "keySequence", keys: keys, description: description, path: nil, command: nil, text: nil, steps: nil, profile: nil)
         case .application(let path, let description):
-            return ButtonAction(type: "application", keys: nil, description: description, path: path, command: nil, steps: nil, profile: nil)
+            return ButtonAction(type: "application", keys: nil, description: description, path: path, command: nil, text: nil, steps: nil, profile: nil)
         case .systemCommand(let command, let description):
-            return ButtonAction(type: "systemCommand", keys: nil, description: description, path: nil, command: command, steps: nil, profile: nil)
+            return ButtonAction(type: "systemCommand", keys: nil, description: description, path: nil, command: command, text: nil, steps: nil, profile: nil)
+        case .textSnippet(let text, let description):
+            return ButtonAction(type: "textSnippet", keys: nil, description: description, path: nil, command: nil, text: text, steps: nil, profile: nil)
         case .macro(let steps, let description):
-            return ButtonAction(type: "macro", keys: nil, description: description, path: nil, command: nil, steps: steps, profile: nil)
+            return ButtonAction(type: "macro", keys: nil, description: description, path: nil, command: nil, text: nil, steps: steps, profile: nil)
         case .profileSwitch(let profile, let description):
-            return ButtonAction(type: "profileSwitch", keys: nil, description: description, path: nil, command: nil, steps: nil, profile: profile)
+            return ButtonAction(type: "profileSwitch", keys: nil, description: description, path: nil, command: nil, text: nil, steps: nil, profile: profile)
         }
     }
 

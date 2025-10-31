@@ -178,15 +178,16 @@ final class MouseMappingView: NSView {
         guard let action = action else { return "(Unassigned)" }
         switch action {
         case .keySequence(let keys, let d):
-            let ks = keys.map { stroke in
-                let mods = stroke.modifiers.map { $0.capitalized }.joined(separator: "+")
-                return mods.isEmpty ? stroke.key.uppercased() : "\(mods)+\(stroke.key.uppercased())"
-            }.joined(separator: ", ")
+            let ks = keys.map { $0.formattedShortcut() }.joined(separator: ", ")
             return d ?? "Key Sequence: \(ks)"
         case .application(let path, let d):
             return d ?? "Open App: \(path)"
         case .systemCommand(let cmd, let d):
             return d ?? "Command: \(cmd)"
+        case .textSnippet(let text, let d):
+            let preview = text.replacingOccurrences(of: "\n", with: " ⏎ ")
+            let truncated = preview.count > 40 ? String(preview.prefix(37)) + "…" : preview
+            return d ?? "Type Text: \(truncated)"
         case .macro(_, let d):
             return d ?? "Macro"
         case .profileSwitch(let p, let d):

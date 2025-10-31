@@ -36,16 +36,19 @@ final class ButtonMapper {
         }
         switch action {
         case .keySequence(let keys, _):
-            if let stroke = keys.first, keys.count == 1, let keyCode = keyCodeForLetter(stroke.key) {
+            if let stroke = keys.first, keys.count == 1 {
+                let keyCode = effectiveKeyCode(for: stroke)
                 let flags = modifierFlags(from: stroke.modifiers)
-                if let eventDown = CGEvent(keyboardEventSource: nil, virtualKey: keyCode, keyDown: true) {
+                if let code = keyCode, let eventDown = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: true) {
                     eventDown.flags = flags
                     eventDown.post(tap: .cghidEventTap)
-                    activeHolds[buttonIndex] = (keyCode, flags)
-                    NSLog("[Mapping] Hold start for button \(buttonIndex) -> key=\(stroke.key), flags=\(flags)")
+                    activeHolds[buttonIndex] = (code, flags)
+                    NSLog("[Mapping] Hold start for button \(buttonIndex) -> key=\(stroke.displayLabel), flags=\(flags)")
+                } else {
+                    // If no keycode, fallback to sending sequence taps to stay functional
+                    for stroke in keys { sendKeyStroke(stroke) }
                 }
             } else {
-                // Fall back to tapping the sequence
                 for stroke in keys { sendKeyStroke(stroke) }
             }
         default:
@@ -74,6 +77,8 @@ final class ButtonMapper {
             NSWorkspace.shared.open(URL(fileURLWithPath: path))
         case .systemCommand(let command, _):
             runShell(command)
+        case .textSnippet(let text, _):
+            typeText(text)
         case .macro(let steps, _):
             runMacro(steps)
         case .profileSwitch(let profile, _):
@@ -83,7 +88,7 @@ final class ButtonMapper {
 
     private func sendKeyStroke(_ stroke: KeyStroke) {
         // Map simple keys (letters) to key codes; limited for Phase 1
-        guard let keyCode = keyCodeForLetter(stroke.key) else { return }
+        guard let keyCode = effectiveKeyCode(for: stroke) else { return }
 
         let flags = modifierFlags(from: stroke.modifiers)
 
@@ -99,19 +104,11 @@ final class ButtonMapper {
         }
     }
 
-    private func keyCodeForLetter(_ letter: String) -> CGKeyCode? {
-        let mapping: [String: CGKeyCode] = [
-            "a": CGKeyCode(kVK_ANSI_A), "b": CGKeyCode(kVK_ANSI_B), "c": CGKeyCode(kVK_ANSI_C),
-            "d": CGKeyCode(kVK_ANSI_D), "e": CGKeyCode(kVK_ANSI_E), "f": CGKeyCode(kVK_ANSI_F),
-            "g": CGKeyCode(kVK_ANSI_G), "h": CGKeyCode(kVK_ANSI_H), "i": CGKeyCode(kVK_ANSI_I),
-            "j": CGKeyCode(kVK_ANSI_J), "k": CGKeyCode(kVK_ANSI_K), "l": CGKeyCode(kVK_ANSI_L),
-            "m": CGKeyCode(kVK_ANSI_M), "n": CGKeyCode(kVK_ANSI_N), "o": CGKeyCode(kVK_ANSI_O),
-            "p": CGKeyCode(kVK_ANSI_P), "q": CGKeyCode(kVK_ANSI_Q), "r": CGKeyCode(kVK_ANSI_R),
-            "s": CGKeyCode(kVK_ANSI_S), "t": CGKeyCode(kVK_ANSI_T), "u": CGKeyCode(kVK_ANSI_U),
-            "v": CGKeyCode(kVK_ANSI_V), "w": CGKeyCode(kVK_ANSI_W), "x": CGKeyCode(kVK_ANSI_X),
-            "y": CGKeyCode(kVK_ANSI_Y), "z": CGKeyCode(kVK_ANSI_Z)
-        ]
-        return mapping[letter.lowercased()]
+    private func effectiveKeyCode(for stroke: KeyStroke) -> CGKeyCode? {
+        if let code = stroke.keyCode {
+            return CGKeyCode(code)
+        }
+        return KeyStroke.keyCode(for: stroke.key).map { CGKeyCode($0) }
     }
 
     private func modifierFlags(from modifiers: [String]) -> CGEventFlags {
@@ -160,5 +157,12 @@ final class ButtonMapper {
         NSPasteboard.general.setString(text, forType: .string)
         // Cmd+V
         sendKeyStroke(KeyStroke(key: "v", modifiers: ["cmd"]))
+    }
+
+    private func typeText(_ text: String) {
+        for scalar in text.unicodeScalars {
+            guard let keyStroke = KeyStroke.fromCharacter(scalar) else { continue }
+            sendKeyStroke(keyStroke)
+        }
     }
 }
