@@ -21,10 +21,11 @@ enum MediaKeyType: Int, Codable, CaseIterable {
     case mute = 7        // NX_KEYTYPE_MUTE
     case brightnessUp = 2 // NX_KEYTYPE_BRIGHTNESS_UP
     case brightnessDown = 3 // NX_KEYTYPE_BRIGHTNESS_DOWN
-    case showDesktop = 55 // CGKeyCode for F11
-    case missionControl = 126 // Up arrow + Ctrl
-    case appExpose = 125 // Down arrow + Ctrl
-    case launchpad = 130 // Just an example, maybe F4 (118)
+    case showDesktop = 55
+    case missionControl = 126
+    case appExpose = 125
+    case appsGrid = 130
+    case controlCenter = 131
     
     var label: String {
         switch self {
@@ -39,7 +40,8 @@ enum MediaKeyType: Int, Codable, CaseIterable {
         case .showDesktop: return "Show Desktop"
         case .missionControl: return "Mission Control"
         case .appExpose: return "App Exposé"
-        case .launchpad: return "Launchpad"
+        case .appsGrid: return "Apps Grid"
+        case .controlCenter: return "Control Center"
         }
     }
 }

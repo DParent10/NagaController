@@ -180,16 +180,19 @@ final class ButtonMapper {
         // Handle non-media special OS keys using standard CGEvent emulation
         switch key {
         case .showDesktop:
-            sendKeyStroke(KeyStroke(key: "f11", modifiers: [], keyCode: UInt16(kVK_F11)))
+            runShell("osascript -e 'tell application \"System Events\" to key code 103'")
             return
         case .missionControl:
-            sendKeyStroke(KeyStroke(key: "up arrow", modifiers: ["ctrl"], keyCode: UInt16(kVK_UpArrow)))
+            runShell("open -a \"Mission Control\"")
             return
         case .appExpose:
-            sendKeyStroke(KeyStroke(key: "down arrow", modifiers: ["ctrl"], keyCode: UInt16(kVK_DownArrow)))
+            runShell("open -a \"Mission Control\" --args 2")
             return
-        case .launchpad:
-            sendKeyStroke(KeyStroke(key: "f4", modifiers: [], keyCode: UInt16(kVK_F4)))
+        case .appsGrid:
+            runShell("open /System/Applications/Apps.app")
+            return
+        case .controlCenter:
+            runShell("open /System/Library/CoreServices/ControlCenter.app")
             return
         default: break
         }
