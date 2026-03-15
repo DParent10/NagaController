@@ -61,6 +61,7 @@ final class ActionEditorViewController: NSViewController {
     // Temporary storage for edits before saving
     private var tempStandardAction: ActionType?
     private var tempHypershiftAction: ActionType?
+    private let initialLayer: Int
     
     // Common
     private let descriptionField = NSTextField(string: "")
@@ -119,8 +120,9 @@ final class ActionEditorViewController: NSViewController {
     private var recordedKeyCode: UInt16?
     private var recordedKeyIdentifier: String?
 
-    init(buttonIndex: Int, onComplete: @escaping (ActionType?) -> Void) {
+    init(buttonIndex: Int, initialLayer: Int = 0, onComplete: @escaping (ActionType?) -> Void) {
         self.buttonIndex = buttonIndex
+        self.initialLayer = initialLayer
         self.onComplete = onComplete
         
         let standardActionMap = ConfigManager.shared.mappingForCurrentProfile()
@@ -156,7 +158,7 @@ final class ActionEditorViewController: NSViewController {
         
         layerSegmented.target = self
         layerSegmented.action = #selector(layerChanged)
-        layerSegmented.selectedSegment = 0
+        layerSegmented.selectedSegment = initialLayer
 
         segmented.target = self
         segmented.action = #selector(segmentedChanged)

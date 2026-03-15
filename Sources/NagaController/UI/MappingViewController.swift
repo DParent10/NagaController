@@ -22,6 +22,8 @@ final class MappingViewController: NSViewController {
     private let saveButton: NSButton = NSButton(title: "Save", target: nil, action: nil)
     private let stack = NSStackView() // unused legacy
     private var grid: NSGridView?
+    private var isHypershiftView = false
+    private let hypershiftToggle = NSButton(title: "Hypershift", target: nil, action: nil)
 
     private var rowViews: [Int: NSView] = [:]
     private var descLabels: [Int: NSTextField] = [:]
@@ -90,11 +92,24 @@ final class MappingViewController: NSViewController {
         titlesStack.alignment = .leading
         titlesStack.spacing = 0
 
+        hypershiftToggle.setButtonType(.pushOnPushOff)
+        hypershiftToggle.bezelStyle = .recessed
+        hypershiftToggle.wantsLayer = true
+        hypershiftToggle.layer?.cornerRadius = 8
+        hypershiftToggle.target = self
+        hypershiftToggle.action = #selector(hypershiftToggleTapped(_:))
+        hypershiftToggle.font = .systemFont(ofSize: 13, weight: .bold)
+        hypershiftToggle.image = UIStyle.symbol("bolt.fill", size: 14)
+        hypershiftToggle.imagePosition = .imageLeading
+        hypershiftToggle.widthAnchor.constraint(equalToConstant: 120).isActive = true
+        hypershiftToggle.heightAnchor.constraint(equalToConstant: 32).isActive = true
+
         topBar.addArrangedSubview(titlesStack)
         topBar.addArrangedSubview(NSView()) // spacer
         topBar.addArrangedSubview(profileLabel)
         topBar.addArrangedSubview(profilePopup)
         topBar.addArrangedSubview(managePopup)
+        topBar.addArrangedSubview(hypershiftToggle)
         topBar.addArrangedSubview(saveButton)
 
         // (Removed mouse visualization)
@@ -378,10 +393,15 @@ final class MappingViewController: NSViewController {
     }
 
     private func refreshRows() {
-        let mapping = ConfigManager.shared.mappingForCurrentProfile()
+        let mapping = isHypershiftView ? ConfigManager.shared.hypershiftMappingForCurrentProfile() : ConfigManager.shared.mappingForCurrentProfile()
         for i in 1...14 {
             descLabels[i]?.stringValue = actionDescription(mapping[i])
         }
+        
+        // Update toggle appearance
+        hypershiftToggle.layer?.backgroundColor = isHypershiftView ? UIStyle.razerGreen.withAlphaComponent(0.2).cgColor : NSColor.white.withAlphaComponent(0.1).cgColor
+        hypershiftToggle.contentTintColor = isHypershiftView ? UIStyle.razerGreen : .white
+        
         headerLabel.stringValue = ConfigManager.shared.currentProfileName
         reloadProfilesPopup()
     }
@@ -411,19 +431,34 @@ final class MappingViewController: NSViewController {
         }
     }
 
+    @objc private func hypershiftToggleTapped(_ sender: NSButton) {
+        isHypershiftView = (sender.state == .on)
+        refreshRows()
+    }
+
     @objc private func editTapped(_ sender: NSButton) {
         let idx = sender.tag
-        let editor = ActionEditorViewController(buttonIndex: idx) { [weak self] action in
+        let editor = ActionEditorViewController(buttonIndex: idx, initialLayer: isHypershiftView ? 1 : 0) { [weak self] action in
+            guard let self = self else { return }
             if let action = action {
-                ConfigManager.shared.setAction(forButton: idx, action: action)
+                if self.isHypershiftView {
+                    ConfigManager.shared.setHypershiftAction(forButton: idx, action: action)
+                } else {
+                    ConfigManager.shared.setAction(forButton: idx, action: action)
+                }
             }
-            self?.refreshRows()
+            self.refreshRows()
         }
         presentAsSheet(editor)
     }
 
     @objc private func clearTapped(_ sender: NSButton) {
-        ConfigManager.shared.setAction(forButton: sender.tag, action: nil)
+        let idx = sender.tag
+        if isHypershiftView {
+            ConfigManager.shared.setHypershiftAction(forButton: idx, action: nil)
+        } else {
+            ConfigManager.shared.setAction(forButton: idx, action: nil)
+        }
         refreshRows()
     }
 
