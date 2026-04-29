@@ -438,15 +438,8 @@ final class MappingViewController: NSViewController {
 
     @objc private func editTapped(_ sender: NSButton) {
         let idx = sender.tag
-        let editor = ActionEditorViewController(buttonIndex: idx, initialLayer: isHypershiftView ? 1 : 0) { [weak self] action in
+        let editor = ActionEditorViewController(buttonIndex: idx, initialLayer: isHypershiftView ? 1 : 0) { [weak self] in
             guard let self = self else { return }
-            if let action = action {
-                if self.isHypershiftView {
-                    ConfigManager.shared.setHypershiftAction(forButton: idx, action: action)
-                } else {
-                    ConfigManager.shared.setAction(forButton: idx, action: action)
-                }
-            }
             self.refreshRows()
         }
         presentAsSheet(editor)

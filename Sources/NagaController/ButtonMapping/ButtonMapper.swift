@@ -55,18 +55,30 @@ final class ButtonMapper {
     // Handle physical button press (down). For single-key mappings, send keyDown and remember for hold.
     func handlePress(buttonIndex: Int) {
         // Handle hypershift button
-        if let baseAction = mapping[buttonIndex], case .hypershift = baseAction {
-            hypershiftHolders.insert(buttonIndex)
+        if let baseAction = mapping[buttonIndex], case .hypershift(let mode) = baseAction {
+            if mode == .hold {
+                hypershiftHolders.insert(buttonIndex)
+                NSLog("[Mapping] Hypershift activated (physically held by button \(buttonIndex))")
+            } else if mode == .toggle {
+                isHypershiftToggled.toggle()
+                NSLog("[Mapping] Hypershift toggled to \(isHypershiftToggled) by button \(buttonIndex)")
+            }
             lastHypershiftPressTime = CFAbsoluteTimeGetCurrent()
-            NSLog("[Mapping] Hypershift activated (physically held by button \(buttonIndex))")
             return
         }
 
         let actionToPerform: ActionType?
-        if isHypershiftActive, let hAction = hypershiftMapping[buttonIndex] {
-            actionToPerform = hAction
+        if isHypershiftActive {
+            if let hAction = hypershiftMapping[buttonIndex] {
+                actionToPerform = hAction
+                NSLog("[Mapping] Button \(buttonIndex) matched Hypershift mapping: \(hAction)")
+            } else {
+                actionToPerform = mapping[buttonIndex]
+                NSLog("[Mapping] Button \(buttonIndex) fallback to Standard mapping (Hypershift active but no specific mapping): \(String(describing: actionToPerform))")
+            }
         } else {
             actionToPerform = mapping[buttonIndex]
+            NSLog("[Mapping] Button \(buttonIndex) Standard mapping: \(String(describing: actionToPerform))")
         }
 
         guard let action = actionToPerform else {
@@ -111,21 +123,11 @@ final class ButtonMapper {
 
     // Handle physical button release (up). If we are holding, send keyUp and clear state.
     func handleRelease(buttonIndex: Int) {
-        if let baseAction = mapping[buttonIndex], case .hypershift = baseAction {
-            hypershiftHolders.remove(buttonIndex)
-            
-            // TAP-TO-TOGGLE: If released very quickly, toggle the persistent state
-            let duration = CFAbsoluteTimeGetCurrent() - lastHypershiftPressTime
-            if duration < 0.300 { // 300ms threshold for a "tap"
-                isHypershiftToggled.toggle()
-                NSLog("[Mapping] Hypershift TAPPED -> Toggled to \(isHypershiftToggled)")
-            } else {
-                NSLog("[Mapping] Hypershift HELD -> Released")
-                // If it was a long hold, we should probably turn off the toggle too if the user wants "hold-to-override-toggle"
-                // But for now, let's keep it simple.
+        if let baseAction = mapping[buttonIndex], case .hypershift(let mode) = baseAction {
+            if mode == .hold {
+                hypershiftHolders.remove(buttonIndex)
+                NSLog("[Mapping] Hypershift HELD -> Released. holders=\(hypershiftHolders.count)")
             }
-            
-            NSLog("[Mapping] Hypershift state: holders=\(hypershiftHolders.count), toggled=\(isHypershiftToggled) (Active=\(isHypershiftActive))")
             return
         }
 
@@ -169,7 +171,7 @@ final class ButtonMapper {
             runMacro(steps)
         case .profileSwitch(let profile, _):
             ConfigManager.shared.setCurrentProfile(profile)
-        case .hypershift:
+        case .hypershift(_):
             break
         case .mediaKey(let key, _):
             sendMediaKey(key)
@@ -183,16 +185,8 @@ final class ButtonMapper {
             runShell("osascript -e 'tell application \"System Events\" to key code 103'")
             return
         case .missionControl:
-            runShell("open -a \"Mission Control\"")
-            return
-        case .appExpose:
-            runShell("open -a \"Mission Control\" --args 2")
-            return
-        case .appsGrid:
-            runShell("open /System/Applications/Apps.app")
-            return
-        case .controlCenter:
-            runShell("open /System/Library/CoreServices/ControlCenter.app")
+            if let eventDown = CGEvent(keyboardEventSource: nil, virtualKey: 160, keyDown: true) { eventDown.post(tap: .cghidEventTap) }
+            if let eventUp = CGEvent(keyboardEventSource: nil, virtualKey: 160, keyDown: false) { eventUp.post(tap: .cghidEventTap) }
             return
         default: break
         }

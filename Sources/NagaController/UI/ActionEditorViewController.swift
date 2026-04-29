@@ -52,7 +52,7 @@ private struct ShortcutPreset {
 
 final class ActionEditorViewController: NSViewController {
     private let buttonIndex: Int
-    private let onComplete: (ActionType?) -> Void
+    private let onComplete: () -> Void
     private var initialRemappingState: Bool = false
     
     private let segmented = NSSegmentedControl(labels: ["Key", "App", "Cmd", "Text", "Profile", "macOS", "Hypershift"], trackingMode: .selectOne, target: nil, action: nil)
@@ -116,11 +116,18 @@ final class ActionEditorViewController: NSViewController {
     private let learnButton = NSButton(title: "Learn Hardware Trigger…", target: nil, action: nil)
     private let clearHardwareButton = NSButton(title: "", target: nil, action: nil)
     private var isLearningHardware = false
+    private var isCoolingDown = false
+
+    // Hypershift mode picker (hold / toggle)
+    private let hypershiftModeSegmented = NSSegmentedControl(
+        labels: ["Hold to Activate", "Click to Toggle"],
+        trackingMode: .selectOne, target: nil, action: nil
+    )
 
     private var recordedKeyCode: UInt16?
     private var recordedKeyIdentifier: String?
 
-    init(buttonIndex: Int, initialLayer: Int = 0, onComplete: @escaping (ActionType?) -> Void) {
+    init(buttonIndex: Int, initialLayer: Int = 0, onComplete: @escaping () -> Void) {
         self.buttonIndex = buttonIndex
         self.initialLayer = initialLayer
         self.onComplete = onComplete
@@ -305,12 +312,22 @@ final class ActionEditorViewController: NSViewController {
         let macosGroup = group("macOS / Media Keys", views: [macosRow])
 
         // Hypershift UI
-        let hsHint = NSTextField(labelWithString: "Acting as Hypershift modifier: while held, this button unlocks secondary functions on all other keys.")
+        let hsHint = NSTextField(labelWithString: "This button unlocks the Hypershift layer. Choose how it activates below:")
         hsHint.font = .systemFont(ofSize: 12)
         hsHint.textColor = NSColor.white.withAlphaComponent(0.6)
         hsHint.lineBreakMode = .byWordWrapping
         hsHint.maximumNumberOfLines = 3
-        let hsGroup = group("Hypershift Active", views: [hsHint])
+
+        let hsModeLabel = NSTextField(labelWithString: "Activation Mode:")
+        hsModeLabel.font = .systemFont(ofSize: 11, weight: .black)
+        hsModeLabel.textColor = NSColor.white.withAlphaComponent(0.3)
+        hypershiftModeSegmented.selectedSegment = 0 // default: hold
+
+        let hsModeRow = NSStackView(views: [hsModeLabel, hypershiftModeSegmented])
+        hsModeRow.spacing = 12
+        hsModeRow.alignment = .centerY
+
+        let hsGroup = group("Hypershift Active", views: [hsHint, hsModeRow])
 
         // Content stack
         contentStack.orientation = .vertical
@@ -462,13 +479,22 @@ final class ActionEditorViewController: NSViewController {
     }
 
     @objc private func layerChanged() {
-        // Save current UI state to temp var
+        // Save current UI state to temp var BEFORE switching view
+        // Note: buildActionFromUI() reflects what is currently DISPLAYED.
+        // If we are switching from Standard to Hypershift, buildActionFromUI() is the old Standard action.
         let action = buildActionFromUI()
+        
+        // layerSegmented.selectedSegment is the NEW value after the click
         if layerSegmented.selectedSegment == 1 {
-            tempStandardAction = action // Switched to Hypershift, save Standard
+            // We moved TO Hypershift, so the UI we just left was Standard
+            tempStandardAction = action
+            NSLog("[ActionEditor] Switched to Hypershift layer, cached Standard action: \(String(describing: action))")
         } else {
-            tempHypershiftAction = action // Switched to Standard, save Hypershift
+            // We moved TO Standard, so the UI we just left was Hypershift
+            tempHypershiftAction = action
+            NSLog("[ActionEditor] Switched to Standard layer, cached Hypershift action: \(String(describing: action))")
         }
+        
         preloadCurrent()
     }
 
@@ -539,7 +565,8 @@ final class ActionEditorViewController: NSViewController {
             descriptionField.stringValue = desc ?? ""
             segmented.selectedSegment = 5
             selectGroup(index: 5)
-        case .hypershift:
+        case .hypershift(let mode):
+            hypershiftModeSegmented.selectedSegment = (mode == .toggle) ? 1 : 0
             descriptionField.stringValue = ""
             segmented.selectedSegment = 6
             selectGroup(index: 6)
@@ -551,24 +578,28 @@ final class ActionEditorViewController: NSViewController {
 
     @objc private func cancelTapped() {
         dismiss(self)
-        onComplete(nil)
+        onComplete()
     }
 
     @objc private func saveTapped() {
-        // Save current UI state to temp
+        // Finalise the currently visible layer's UI state into temp storage
         let finalAction = buildActionFromUI()
         if layerSegmented.selectedSegment == 0 {
             tempStandardAction = finalAction
         } else {
             tempHypershiftAction = finalAction
         }
-        
-        // Save immediately bypassing onComplete wrapper or by calling setAction directly.
-        // Wait, onComplete tells MappingViewController to clear the sheet and reload logic.
-        // We'll call setHypershiftAction directly here, and use onComplete for standard action.
-        ConfigManager.shared.setHypershiftAction(forButton: buttonIndex, action: tempHypershiftAction)
-        
-        onComplete(tempStandardAction)
+
+        NSLog("[ActionEditor] Saving both layers for button \(buttonIndex). Standard: \(String(describing: tempStandardAction)), Hypershift: \(String(describing: tempHypershiftAction))")
+
+        // Save BOTH layers atomically
+        ConfigManager.shared.setBothActions(
+            forButton: buttonIndex,
+            standard: tempStandardAction,
+            hypershift: tempHypershiftAction
+        )
+
+        onComplete()
         dismiss(self)
     }
     
@@ -604,7 +635,8 @@ final class ActionEditorViewController: NSViewController {
         case 5:
             return .mediaKey(key: selectedMediaKey, description: desc)
         case 6:
-            return .hypershift
+            let mode: HypershiftMode = (hypershiftModeSegmented.selectedSegment == 1) ? .toggle : .hold
+            return .hypershift(mode: mode)
         default:
             return nil
         }
@@ -618,7 +650,7 @@ final class ActionEditorViewController: NSViewController {
     private func set(mod: NSButton, from on: Bool) { mod.state = on ? .on : .off }
 
     private func capture(event: NSEvent) {
-        if isLearningHardware { return }
+        if isLearningHardware || isCoolingDown { return }
         if event.type == .flagsChanged {
             applyModifiers(from: event.modifierFlags)
             updateKeyFieldDisplay()
@@ -788,7 +820,13 @@ final class ActionEditorViewController: NSViewController {
         isLearningHardware = false
         learnButton.title = "Learn Hardware Trigger…"
         learnButton.isEnabled = true
-        
+
+        // Guard: only save if we actually captured something meaningful
+        guard pendingUsagePage != nil || pendingUsage != nil || pendingKeyCode != nil else {
+            NSLog("[Learn] Timed out with no input — discarding empty binding")
+            return
+        }
+
         let binding = HardwareBinding(
             usagePage: pendingUsagePage,
             usage: pendingUsage,
@@ -798,10 +836,11 @@ final class ActionEditorViewController: NSViewController {
         )
         ConfigManager.shared.setHardwareBinding(forButton: buttonIndex, binding: binding)
         updateHardwareDisplay()
-        
-        // Small delay to ensure any trailing events from the same press are ignored
+
+        // Cooldown: block capture() from picking up trailing events from the same physical press
+        isCoolingDown = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            self?.isLearningHardware = false
+            self?.isCoolingDown = false
         }
     }
 

@@ -1,6 +1,11 @@
 import Foundation
 import Carbon.HIToolbox
 
+enum HypershiftMode: String, Codable, CaseIterable {
+    case hold
+    case toggle
+}
+
 enum ActionType: Equatable {
     case keySequence(keys: [KeyStroke], description: String?)
     case application(path: String, description: String?)
@@ -8,7 +13,7 @@ enum ActionType: Equatable {
     case textSnippet(text: String, description: String?)
     case macro(steps: [MacroStep], description: String?)
     case profileSwitch(profile: String, description: String?)
-    case hypershift
+    case hypershift(mode: HypershiftMode)
     case mediaKey(key: MediaKeyType, description: String?)
 }
 
@@ -21,11 +26,8 @@ enum MediaKeyType: Int, Codable, CaseIterable {
     case mute = 7        // NX_KEYTYPE_MUTE
     case brightnessUp = 2 // NX_KEYTYPE_BRIGHTNESS_UP
     case brightnessDown = 3 // NX_KEYTYPE_BRIGHTNESS_DOWN
-    case showDesktop = 55
     case missionControl = 126
-    case appExpose = 125
-    case appsGrid = 130
-    case controlCenter = 131
+    case showDesktop = 55
     
     var label: String {
         switch self {
@@ -37,11 +39,8 @@ enum MediaKeyType: Int, Codable, CaseIterable {
         case .mute: return "Mute"
         case .brightnessUp: return "Brightness Up"
         case .brightnessDown: return "Brightness Down"
-        case .showDesktop: return "Show Desktop"
         case .missionControl: return "Mission Control"
-        case .appExpose: return "App Exposé"
-        case .appsGrid: return "Apps Grid"
-        case .controlCenter: return "Control Center"
+        case .showDesktop: return "Show Desktop"
         }
     }
 }

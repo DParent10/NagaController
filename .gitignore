@@ -69,3 +69,6 @@ dmg-assets/temp.dmg
 .DS_Store
 .build/
 /NagaController.app
+
+# Ignore built binaries
+dist/

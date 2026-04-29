@@ -39,6 +39,7 @@ struct ButtonAction: Codable {
     let steps: [MacroStep]? // for macro
     let profile: String? // for profileSwitch
     let mediaKey: Int? // for mediaKey
+    let mode: String? // for hypershift
 }
 
 final class ConfigManager {
@@ -264,7 +265,8 @@ final class ConfigManager {
             if let p = action.profile { return .profileSwitch(profile: p, description: action.description) }
             return nil
         case "hypershift":
-            return .hypershift
+            let hsMode: HypershiftMode = (action.mode == "toggle") ? .toggle : .hold
+            return .hypershift(mode: hsMode)
         case "mediaKey":
             if let mkRaw = action.mediaKey, let mk = MediaKeyType(rawValue: mkRaw) {
                 return .mediaKey(key: mk, description: action.description)
@@ -278,21 +280,21 @@ final class ConfigManager {
     private func toButtonAction(_ action: ActionType) -> ButtonAction {
         switch action {
         case .keySequence(let keys, let description):
-            return ButtonAction(type: "keySequence", keys: keys, description: description, path: nil, command: nil, text: nil, steps: nil, profile: nil, mediaKey: nil)
+            return ButtonAction(type: "keySequence", keys: keys, description: description, path: nil, command: nil, text: nil, steps: nil, profile: nil, mediaKey: nil, mode: nil)
         case .application(let path, let description):
-            return ButtonAction(type: "application", keys: nil, description: description, path: path, command: nil, text: nil, steps: nil, profile: nil, mediaKey: nil)
+            return ButtonAction(type: "application", keys: nil, description: description, path: path, command: nil, text: nil, steps: nil, profile: nil, mediaKey: nil, mode: nil)
         case .systemCommand(let command, let description):
-            return ButtonAction(type: "systemCommand", keys: nil, description: description, path: nil, command: command, text: nil, steps: nil, profile: nil, mediaKey: nil)
+            return ButtonAction(type: "systemCommand", keys: nil, description: description, path: nil, command: command, text: nil, steps: nil, profile: nil, mediaKey: nil, mode: nil)
         case .textSnippet(let text, let description):
-            return ButtonAction(type: "textSnippet", keys: nil, description: description, path: nil, command: nil, text: text, steps: nil, profile: nil, mediaKey: nil)
+            return ButtonAction(type: "textSnippet", keys: nil, description: description, path: nil, command: nil, text: text, steps: nil, profile: nil, mediaKey: nil, mode: nil)
         case .macro(let steps, let description):
-            return ButtonAction(type: "macro", keys: nil, description: description, path: nil, command: nil, text: nil, steps: steps, profile: nil, mediaKey: nil)
+            return ButtonAction(type: "macro", keys: nil, description: description, path: nil, command: nil, text: nil, steps: steps, profile: nil, mediaKey: nil, mode: nil)
         case .profileSwitch(let profile, let description):
-            return ButtonAction(type: "profileSwitch", keys: nil, description: description, path: nil, command: nil, text: nil, steps: nil, profile: profile, mediaKey: nil)
-        case .hypershift:
-            return ButtonAction(type: "hypershift", keys: nil, description: "Hypershift Modifier", path: nil, command: nil, text: nil, steps: nil, profile: nil, mediaKey: nil)
+            return ButtonAction(type: "profileSwitch", keys: nil, description: description, path: nil, command: nil, text: nil, steps: nil, profile: profile, mediaKey: nil, mode: nil)
+        case .hypershift(let mode):
+            return ButtonAction(type: "hypershift", keys: nil, description: "Hypershift Modifier", path: nil, command: nil, text: nil, steps: nil, profile: nil, mediaKey: nil, mode: mode.rawValue)
         case .mediaKey(let key, let description):
-            return ButtonAction(type: "mediaKey", keys: nil, description: description, path: nil, command: nil, text: nil, steps: nil, profile: nil, mediaKey: key.rawValue)
+            return ButtonAction(type: "mediaKey", keys: nil, description: description, path: nil, command: nil, text: nil, steps: nil, profile: nil, mediaKey: key.rawValue, mode: nil)
         }
     }
 
@@ -307,6 +309,7 @@ final class ConfigManager {
         }
         profiles[currentProfileName] = profile
         ButtonMapper.shared.updateMapping(mappingForCurrentProfile())
+        saveUserProfiles()
     }
 
     func setHypershiftAction(forButton index: Int, action: ActionType?) {
@@ -321,6 +324,38 @@ final class ConfigManager {
         }
         profiles[currentProfileName] = profile
         ButtonMapper.shared.updateHypershiftMapping(hypershiftMappingForCurrentProfile())
+        saveUserProfiles()
+    }
+
+    /// Atomic update for both Standard and Hypershift layers to prevent race conditions or partial saves.
+    func setBothActions(forButton index: Int, standard: ActionType?, hypershift: ActionType?) {
+        var profile = profiles[currentProfileName] ?? Profile(buttons: [:], hardwareBindings: nil, hypershiftMappings: nil)
+        let key = String(index)
+        
+        // Update Standard
+        if let std = standard {
+            profile.buttons[key] = toButtonAction(std)
+        } else {
+            profile.buttons.removeValue(forKey: key)
+        }
+        
+        // Update Hypershift
+        if profile.hypershiftMappings == nil { profile.hypershiftMappings = [:] }
+        if let hs = hypershift {
+            profile.hypershiftMappings?[key] = toButtonAction(hs)
+        } else {
+            profile.hypershiftMappings?.removeValue(forKey: key)
+        }
+        
+        // Persist once
+        profiles[currentProfileName] = profile
+        
+        // Sync both mappings to runtime
+        ButtonMapper.shared.updateMapping(mappingForCurrentProfile())
+        ButtonMapper.shared.updateHypershiftMapping(hypershiftMappingForCurrentProfile())
+        
+        saveUserProfiles()
+        NSLog("[Config] Atomically updated standard and hypershift actions for button \(index)")
     }
 
     func setHardwareBinding(forButton index: Int, binding: HardwareBinding?) {
