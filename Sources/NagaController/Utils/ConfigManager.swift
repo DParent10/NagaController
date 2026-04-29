@@ -376,35 +376,28 @@ final class ConfigManager {
     func getHardwareBinding(forUsage usage: UInt32, usagePage: UInt32, cookie: UInt32? = nil, value: Int32? = nil) -> HardwareBinding? {
         guard let bindings = profiles[currentProfileName]?.hardwareBindings else { return nil }
         
-        // 1. Try exact match (Usage, Page, Cookie, and Value if provided)
-        for (_, binding) in bindings {
-            if binding.usage == usage && binding.usagePage == usagePage {
-                let cookieMatches = (binding.cookie == nil || cookie == nil || binding.cookie == cookie)
-                let valueMatches = (binding.value == nil || value == nil || binding.value == value)
-                
-                if cookieMatches && valueMatches {
-                    // Favor bindings that match the specific value if multiple exist
-                    if binding.value == value {
-                        return binding
-                    }
-                }
+        // Collect all candidates that match usage, page, and cookie (if applicable)
+        let candidates = bindings.values.filter { b in
+            guard b.usage == usage && b.usagePage == usagePage else { return false }
+            return b.cookie == nil || cookie == nil || b.cookie == cookie
+        }
+        
+        if candidates.isEmpty { return nil }
+
+        // 1. Prioritize exact value match
+        if let val = value {
+            if let exact = candidates.first(where: { $0.value == val }) {
+                return exact
             }
         }
         
-        // 2. Fallback: Match Usage/Page/Cookie if no value-specific binding found
-        for (_, binding) in bindings {
-            if binding.usage == usage && binding.usagePage == usagePage {
-                let cookieMatches = (binding.cookie == nil || cookie == nil || binding.cookie == cookie)
-                if cookieMatches && binding.value == nil {
-                    return binding
-                }
-            }
+        // 2. Fallback to generic binding (no value specified in binding)
+        if let generic = candidates.first(where: { $0.value == nil }) {
+            return generic
         }
-
-        // 3. Ultra-fallback: Match Usage/Page ONLY if there's exactly one binding for this usage/page
-        let candidates = bindings.values.filter { $0.usage == usage && $0.usagePage == usagePage }
+        
+        // 3. Last resort: if only one candidate exists, return it even if value doesn't match perfectly
         if candidates.count == 1 {
-            NSLog("[Config] Ultra-fallback match for usage=0x\(String(usage, radix: 16)) pg=0x\(String(usagePage, radix: 16))")
             return candidates[0]
         }
         

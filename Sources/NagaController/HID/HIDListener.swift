@@ -107,8 +107,10 @@ final class HIDListener {
         // NUCLEAR LOGGING: Every non-movement event from EVERY device
         let isMovement = (usagePage == 0x01 && (usage == 0x30 || usage == 0x31 || usage == 0x38))
         if !isMovement {
+            #if DEBUG
             let valStr = pressedValue != 0 ? "\(pressedValue)" : String(format: "%.3f", scaledValue)
             NSLog("[HID] NUCLEAR EVENT: [\(ptr)] pg=0x\(String(usagePage, radix: 16)), us=0x\(String(usage, radix: 16)), val=\(valStr), prod=\(product) (\(isNaga ? "NAGA" : "OTHER"))")
+            #endif
         }
 
         if isMovement { return }
@@ -276,7 +278,7 @@ final class HIDListener {
     private static func isNagaDevice(device: IOHIDDevice) -> Bool {
         let vendor = vendorID(device: device) ?? 0
         let product = (IOHIDDeviceGetProperty(device, kIOHIDProductKey as CFString) as? String)?.lowercased() ?? ""
-        return vendor == 0x1532 || vendor == 0x068e || vendor == 0x2442 || product.contains("naga")
+        return vendor == 0x1532 || vendor == 0x068e || vendor == 0x2442 /* Cooler Master */ || product.contains("naga")
     }
 
     private static func vendorID(device: IOHIDDevice) -> Int? {

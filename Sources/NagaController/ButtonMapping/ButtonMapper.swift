@@ -4,12 +4,7 @@ import Carbon.HIToolbox
 final class ButtonMapper {
     static let shared = ButtonMapper()
 
-    // Temporary in-memory mapping for Phase 1
-    // 1 -> Cmd+C, 2 -> Cmd+V, others log only
-    private var mapping: [Int: ActionType] = [
-        1: .keySequence(keys: [KeyStroke(key: "c", modifiers: ["cmd"])], description: "Copy"),
-        2: .keySequence(keys: [KeyStroke(key: "v", modifiers: ["cmd"])], description: "Paste")
-    ]
+    private var mapping: [Int: ActionType] = [:]
     private var hypershiftMapping: [Int: ActionType] = [:]
     private var hypershiftHolders: Set<Int> = []
     private var isHypershiftToggled: Bool = false
@@ -196,7 +191,7 @@ final class ButtonMapper {
         let keyDown = NSEvent.otherEvent(
             with: .systemDefined,
             location: .zero,
-            modifierFlags: ProcessInfo.processInfo.activeProcessorCount > 0 ? NSEvent.ModifierFlags(rawValue: 0xa00) : [], // Magic flags sometimes needed
+            modifierFlags: NSEvent.ModifierFlags(rawValue: 0xa00), // Key down magic flags
             timestamp: 0,
             windowNumber: 0,
             context: nil,
@@ -207,7 +202,7 @@ final class ButtonMapper {
         let keyUp = NSEvent.otherEvent(
             with: .systemDefined,
             location: .zero,
-            modifierFlags: ProcessInfo.processInfo.activeProcessorCount > 0 ? NSEvent.ModifierFlags(rawValue: 0xb00) : [],
+            modifierFlags: NSEvent.ModifierFlags(rawValue: 0xb00), // Key up magic flags
             timestamp: 0,
             windowNumber: 0,
             context: nil,
@@ -258,9 +253,6 @@ final class ButtonMapper {
             }
         }
         return flags
-    }
-    private func isModifier(_ keyCode: CGKeyCode) -> Bool {
-        return modifierFlag(for: keyCode) != nil
     }
 
     private func modifierFlag(for keyCode: CGKeyCode) -> CGEventFlags? {
