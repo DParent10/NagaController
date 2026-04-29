@@ -122,6 +122,14 @@ final class ButtonMapper {
             if mode == .hold {
                 hypershiftHolders.remove(buttonIndex)
                 NSLog("[Mapping] Hypershift HELD -> Released. holders=\(hypershiftHolders.count)")
+            } else if mode == .toggle {
+                // Long-hold (> 0.5s) force-deactivates Hypershift, giving users an escape hatch.
+                // Short taps still behave as normal toggle (on/off).
+                let holdDuration = CFAbsoluteTimeGetCurrent() - lastHypershiftPressTime
+                if holdDuration > 0.5, isHypershiftToggled {
+                    isHypershiftToggled = false
+                    NSLog("[Mapping] Hypershift TOGGLE force-deactivated via long hold (\(String(format: "%.2f", holdDuration))s)")
+                }
             }
             return
         }
@@ -174,12 +182,19 @@ final class ButtonMapper {
     }
 
     private func sendMediaKey(_ key: MediaKeyType) {
-        // Handle non-media special OS keys using standard CGEvent emulation
+        // Handle non-media special OS keys via native CGEvent emulation.
+        // Both cases post a raw virtualKey down+up pair directly to the HID event tap,
+        // avoiding shell subprocesses, AppleScript overhead, and sandbox restrictions.
         switch key {
         case .showDesktop:
-            runShell("osascript -e 'tell application \"System Events\" to key code 103'")
+            // Virtual key 103 = kVK_F11, the macOS default "Show Desktop" key.
+            // Using CGEvent mirrors exactly what the previous osascript was doing
+            // but without a shell process or permission friction.
+            if let eventDown = CGEvent(keyboardEventSource: nil, virtualKey: 103, keyDown: true) { eventDown.post(tap: .cghidEventTap) }
+            if let eventUp = CGEvent(keyboardEventSource: nil, virtualKey: 103, keyDown: false) { eventUp.post(tap: .cghidEventTap) }
             return
         case .missionControl:
+            // Virtual key 160 = NX_KEYTYPE_MISSION_CONTROL mapped through the HID system.
             if let eventDown = CGEvent(keyboardEventSource: nil, virtualKey: 160, keyDown: true) { eventDown.post(tap: .cghidEventTap) }
             if let eventUp = CGEvent(keyboardEventSource: nil, virtualKey: 160, keyDown: false) { eventUp.post(tap: .cghidEventTap) }
             return
