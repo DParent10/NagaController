@@ -23,8 +23,8 @@ final class HIDListener {
     private var learningCallback: ((UInt32, UInt32, IOHIDElementCookie, Int32, Int, Int) -> Void)?
 
     private static let whitelistedVendors: Set<Int> = [
-        0x1532, // Razer
-        0x068e  // CH Products
+        0x1532,
+        0x068e
     ]
 
     private init() {
