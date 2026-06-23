@@ -20,7 +20,12 @@ final class HIDListener {
     private var syntheticStates: [Int: Bool] = [:]
     private var lastButtonIndexForCookie: [UInt32: Int] = [:]
     
-    private var learningCallback: ((UInt32, UInt32, IOHIDElementCookie, Int32) -> Void)?
+    private var learningCallback: ((UInt32, UInt32, IOHIDElementCookie, Int32, Int, Int) -> Void)?
+
+    private static let whitelistedVendors: Set<Int> = [
+        0x1532, // Razer
+        0x068e  // CH Products
+    ]
 
     private init() {
         manager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
@@ -79,7 +84,7 @@ final class HIDListener {
         }
     }
 
-    func setLearningCallback(_ callback: ((UInt32, UInt32, IOHIDElementCookie, Int32) -> Void)?) {
+    func setLearningCallback(_ callback: ((UInt32, UInt32, IOHIDElementCookie, Int32, Int, Int) -> Void)?) {
         queue.sync {
             learningCallback = callback
         }
@@ -102,37 +107,45 @@ final class HIDListener {
         
         let ptr = Unmanaged.passUnretained(device).toOpaque()
         let isLearning = queue.sync { learningCallback != nil }
-        let isNaga = HIDListener.isNagaDevice(device: device)
+        let isWhitelistedMouse = HIDListener.isWhitelistedMouse(device: device)
+        let vendor = HIDListener.vendorID(device: device) ?? 0
+        let productID = (IOHIDDeviceGetProperty(device, kIOHIDProductIDKey as CFString) as? Int) ?? 0
 
         // NUCLEAR LOGGING: Every non-movement event from EVERY device
         let isMovement = (usagePage == 0x01 && (usage == 0x30 || usage == 0x31 || usage == 0x38))
         if !isMovement {
             #if DEBUG
             let valStr = pressedValue != 0 ? "\(pressedValue)" : String(format: "%.3f", scaledValue)
-            NSLog("[HID] NUCLEAR EVENT: [\(ptr)] pg=0x\(String(usagePage, radix: 16)), us=0x\(String(usage, radix: 16)), val=\(valStr), prod=\(product) (\(isNaga ? "NAGA" : "OTHER"))")
+            NSLog("[HID] NUCLEAR EVENT: [\(ptr)] pg=0x\(String(usagePage, radix: 16)), us=0x\(String(usage, radix: 16)), val=\(valStr), prod=\(product) (\(isWhitelistedMouse ? "WHITELISTED" : "OTHER"))")
             #endif
         }
 
         if isMovement { return }
 
-        // Only accept events from Naga devices (or any device if learning)
-        guard isNaga || isLearning else { return }
-
         let activeVal = (abs(scaledValue) > 0.1) ? Int32(round(scaledValue)) : Int32(pressedValue)
+
+        let binding = ConfigManager.shared.getHardwareBinding(
+            forUsage: usage, usagePage: usagePage, cookie: UInt32(cookie), value: activeVal,
+            vendorID: vendor, productID: productID
+        )
+        let hasBinding = binding != nil
+
+        // Only accept events from whitelisted mice, active learning sessions, or devices with an existing binding
+        guard isWhitelistedMouse || isLearning || hasBinding else { return }
 
         if usagePage != 0x07 {
             if pressed {
                 queue.sync {
                     if let callback = learningCallback {
                         NSLog("[HID] LEARNING: Triggering callback for usagePage=0x\(String(usagePage, radix: 16)), usage=0x\(String(usage, radix: 16)), value=\(activeVal)")
-                        callback(usagePage, usage, cookie, activeVal)
+                        callback(usagePage, usage, cookie, activeVal, vendor, productID)
                         return
                     }
                 }
             }
 
             // Support dynamic mappings for non-keyboard pages
-            let buttonIndex = HIDListener.buttonIndex(forUsage: usage, usagePage: usagePage, cookie: UInt32(cookie), value: activeVal)
+            let buttonIndex = HIDListener.buttonIndex(forUsage: usage, usagePage: usagePage, cookie: UInt32(cookie), value: activeVal, vendorID: vendor, productID: productID)
             
             if let targetIdx = buttonIndex {
                 let remapping = ConfigManager.shared.getRemappingEnabled()
@@ -163,15 +176,17 @@ final class HIDListener {
         queue.sync {
             if let callback = learningCallback {
                 NSLog("[HID] LEARNING (KBD): Triggering callback for usagePage=0x\(String(usagePage, radix: 16)), usage=0x\(String(usage, radix: 16)), value=\(pressedValue)")
-                callback(usagePage, usage, cookie, Int32(pressedValue))
+                callback(usagePage, usage, cookie, Int32(pressedValue), vendor, productID)
             }
         }
         if isLearning { return }
 
-        // Only accept events from Naga devices to avoid remapping real keyboards
-        guard isNaga else { return }
+        // Prevent keyboard interference: only accept keyboard-page events from whitelisted mice
+        // or if the device specifically matches the learned binding's vendorID.
+        let bindingMatchesDevice = binding?.vendorID == vendor
+        guard isWhitelistedMouse || bindingMatchesDevice else { return }
 
-        if let buttonIndex = HIDListener.buttonIndex(forUsage: usage, usagePage: usagePage, cookie: UInt32(cookie), value: Int32(pressedValue)) {
+        if let buttonIndex = HIDListener.buttonIndex(forUsage: usage, usagePage: usagePage, cookie: UInt32(cookie), value: Int32(pressedValue), vendorID: vendor, productID: productID) {
             // Record timestamp for the EventTap to see and block
             record(buttonIndex: buttonIndex)
             NSLog("[HID] Mapped Keyboard press for button \(buttonIndex)")
@@ -258,12 +273,12 @@ final class HIDListener {
         queue.sync {
             if let callback = learningCallback {
                 NSLog("[HID] VIRTUAL TRIGGER (Learning): pg=0x\(String(usagePage, radix: 16)) us=0x\(String(usage, radix: 16))")
-                callback(usagePage, usage, IOHIDElementCookie(0xFFFF), 1)
+                callback(usagePage, usage, IOHIDElementCookie(0xFFFF), 1, 0, 0)
                 return
             }
         }
         
-        if let buttonIndex = HIDListener.buttonIndex(forUsage: usage, usagePage: usagePage, cookie: 0xFFFF, value: 1) {
+        if let buttonIndex = HIDListener.buttonIndex(forUsage: usage, usagePage: usagePage, cookie: 0xFFFF, value: 1, vendorID: 0, productID: 0) {
             handleSynthetic(buttonIndex: buttonIndex, pressed: true, rawValue: 1)
             handleSynthetic(buttonIndex: buttonIndex, pressed: false, rawValue: 0)
         }
@@ -275,10 +290,10 @@ final class HIDListener {
         }
     }
 
-    private static func isNagaDevice(device: IOHIDDevice) -> Bool {
+    private static func isWhitelistedMouse(device: IOHIDDevice) -> Bool {
         let vendor = vendorID(device: device) ?? 0
         let product = (IOHIDDeviceGetProperty(device, kIOHIDProductKey as CFString) as? String)?.lowercased() ?? ""
-        return vendor == 0x1532 || vendor == 0x068e || vendor == 0x2442 /* Cooler Master */ || product.contains("naga")
+        return whitelistedVendors.contains(vendor) || product.contains("naga")
     }
 
     private static func vendorID(device: IOHIDDevice) -> Int? {
@@ -291,8 +306,8 @@ final class HIDListener {
         return nil
     }
 
-    private static func buttonIndex(forUsage usage: UInt32, usagePage: UInt32, cookie: UInt32? = nil, value: Int32? = nil) -> Int? {
-        if let binding = ConfigManager.shared.getHardwareBinding(forUsage: usage, usagePage: usagePage, cookie: cookie, value: value) {
+    private static func buttonIndex(forUsage usage: UInt32, usagePage: UInt32, cookie: UInt32? = nil, value: Int32? = nil, vendorID: Int? = nil, productID: Int? = nil) -> Int? {
+        if let binding = ConfigManager.shared.getHardwareBinding(forUsage: usage, usagePage: usagePage, cookie: cookie, value: value, vendorID: vendorID, productID: productID) {
             let index = ConfigManager.shared.getButtonIndex(forHardwareBinding: binding)
             if index == nil {
                 NSLog("[HID] ERR: Found binding but no button index for binding: \(binding)")

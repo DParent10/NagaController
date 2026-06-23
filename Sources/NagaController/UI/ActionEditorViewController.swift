@@ -756,6 +756,8 @@ final class ActionEditorViewController: NSViewController {
     private var pendingCookie: UInt32?
     private var pendingKeyCode: CGKeyCode?
     private var pendingValue: Int32?
+    private var pendingVendorID: Int?
+    private var pendingProductID: Int?
     private var isFinalizingLearning = false
 
     @objc private func learnHardwareTapped() {
@@ -768,14 +770,18 @@ final class ActionEditorViewController: NSViewController {
         pendingCookie = nil
         pendingKeyCode = nil
         pendingValue = nil
+        pendingVendorID = nil
+        pendingProductID = nil
         isFinalizingLearning = false
         
-        HIDListener.shared.setLearningCallback { [weak self] page, usage, cookie, value in
+        HIDListener.shared.setLearningCallback { [weak self] page, usage, cookie, value, vendorID, productID in
             DispatchQueue.main.async {
                 self?.pendingUsagePage = page
                 self?.pendingUsage = usage
                 self?.pendingCookie = UInt32(cookie)
                 self?.pendingValue = value
+                self?.pendingVendorID = vendorID
+                self?.pendingProductID = productID
                 self?.scheduleFinishLearning()
             }
         }
@@ -832,7 +838,9 @@ final class ActionEditorViewController: NSViewController {
             usage: pendingUsage,
             keyCode: pendingKeyCode.map { UInt16($0) },
             cookie: pendingCookie,
-            value: pendingValue
+            value: pendingValue,
+            vendorID: pendingVendorID,
+            productID: pendingProductID
         )
         ConfigManager.shared.setHardwareBinding(forButton: buttonIndex, binding: binding)
         updateHardwareDisplay()

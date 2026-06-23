@@ -27,6 +27,8 @@ struct HardwareBinding: Codable {
     var keyCode: UInt16?
     var cookie: UInt32?
     var value: Int32?
+    var vendorID: Int?
+    var productID: Int?
 }
 
 struct ButtonAction: Codable {
@@ -373,13 +375,19 @@ final class ConfigManager {
         saveUserProfiles() // Ensure it's saved to disk
     }
 
-    func getHardwareBinding(forUsage usage: UInt32, usagePage: UInt32, cookie: UInt32? = nil, value: Int32? = nil) -> HardwareBinding? {
+    func getHardwareBinding(forUsage usage: UInt32, usagePage: UInt32, cookie: UInt32? = nil, value: Int32? = nil, vendorID: Int? = nil, productID: Int? = nil) -> HardwareBinding? {
         guard let bindings = profiles[currentProfileName]?.hardwareBindings else { return nil }
         
-        // Collect all candidates that match usage, page, and cookie (if applicable)
+        // Collect all candidates that match usage, page, cookie, and vendorID/productID (if stored)
         let candidates = bindings.values.filter { b in
             guard b.usage == usage && b.usagePage == usagePage else { return false }
-            return b.cookie == nil || cookie == nil || b.cookie == cookie
+            if b.cookie != nil && cookie != nil && b.cookie != cookie { return false }
+            
+            // Device-bound mapping check
+            if let bindingVendor = b.vendorID, let currentVendor = vendorID, bindingVendor != currentVendor { return false }
+            if let bindingProduct = b.productID, let currentProduct = productID, bindingProduct != currentProduct { return false }
+            
+            return true
         }
         
         if candidates.isEmpty { return nil }
@@ -407,7 +415,12 @@ final class ConfigManager {
     func getButtonIndex(forHardwareBinding binding: HardwareBinding) -> Int? {
         guard let bindings = profiles[currentProfileName]?.hardwareBindings else { return nil }
         for (key, b) in bindings {
-            if b.usage == binding.usage && b.usagePage == binding.usagePage && b.cookie == binding.cookie && b.value == binding.value {
+            if b.usage == binding.usage &&
+               b.usagePage == binding.usagePage &&
+               b.cookie == binding.cookie &&
+               b.value == binding.value &&
+               b.vendorID == binding.vendorID &&
+               b.productID == binding.productID {
                 return Int(key)
             }
         }
