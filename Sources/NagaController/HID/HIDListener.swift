@@ -139,10 +139,10 @@ final class HIDListener {
                     if let callback = learningCallback {
                         NSLog("[HID] LEARNING: Triggering callback for usagePage=0x\(String(usagePage, radix: 16)), usage=0x\(String(usage, radix: 16)), value=\(activeVal)")
                         callback(usagePage, usage, cookie, activeVal, vendor, productID)
-                        return
                     }
                 }
             }
+            if isLearning { return }
 
             // Support dynamic mappings for non-keyboard pages
             let buttonIndex = HIDListener.buttonIndex(forUsage: usage, usagePage: usagePage, cookie: UInt32(cookie), value: activeVal, vendorID: vendor, productID: productID)
@@ -270,14 +270,16 @@ final class HIDListener {
     }
 
     private func triggerVirtualButton(usagePage: UInt32, usage: UInt32) {
-        queue.sync {
+        let isLearning: Bool = queue.sync {
             if let callback = learningCallback {
                 NSLog("[HID] VIRTUAL TRIGGER (Learning): pg=0x\(String(usagePage, radix: 16)) us=0x\(String(usage, radix: 16))")
                 callback(usagePage, usage, IOHIDElementCookie(0xFFFF), 1, 0, 0)
-                return
+                return true
             }
+            return false
         }
-        
+        if isLearning { return }
+
         if let buttonIndex = HIDListener.buttonIndex(forUsage: usage, usagePage: usagePage, cookie: 0xFFFF, value: 1, vendorID: 0, productID: 0) {
             handleSynthetic(buttonIndex: buttonIndex, pressed: true, rawValue: 1)
             handleSynthetic(buttonIndex: buttonIndex, pressed: false, rawValue: 0)

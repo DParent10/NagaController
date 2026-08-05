@@ -644,6 +644,13 @@ final class ActionEditorViewController: NSViewController {
 
     override func viewWillDisappear() {
         super.viewWillDisappear()
+        // Learning callbacks live on singletons, so dismissing mid-learn would otherwise
+        // leave the EventTap swallowing every keyDown/flagsChanged system-wide.
+        if isLearningHardware {
+            HIDListener.shared.setLearningCallback(nil)
+            EventTapManager.shared.setLearningCallback(nil)
+            isLearningHardware = false
+        }
         EventTapManager.shared.start(listenOnly: !initialRemappingState)
     }
 
