@@ -33,12 +33,15 @@ A macOS menu bar app to remap the 12 side buttons of the Razer Naga V2 Hyperspee
 
 ### First run setup
 
+See the [user guide](USER-GUIDE.md) for shortcuts, profile switching, permissions, and a tested DPI button setup.
+
 1. Click the menu bar icon → turn ON "Enable remapping"
 2. Click "Configure mappings…" to set actions for buttons 1–12
 
 ### Permissions
 
 - **Accessibility**: System Settings → Privacy & Security → Accessibility → enable "NagaController"
+- **Input Monitoring**: System Settings → Privacy & Security → Input Monitoring → enable "NagaController", then quit and reopen the app
 - **Bluetooth (battery)**: System Settings → Privacy & Security → Bluetooth → allow "NagaController"
 - **Tip**: Always launch the same `.app` you granted permissions to (avoid running other binaries) so permissions persist
 
