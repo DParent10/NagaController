@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let popover = NSPopover()
     private let eventTapManager = EventTapManager.shared
     private var batteryObserver: NSObjectProtocol?
+    private var profileObserver: NSObjectProtocol?
     private var didAlertLowBattery = false
     private var useEmojiInStatus = false
 
@@ -60,6 +61,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.handleBatteryUpdate()
         }
         // Initialize status item text
+        profileObserver = NotificationCenter.default.addObserver(
+            forName: ConfigManager.profileDidChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.updateStatusItemBattery(level: BatteryMonitor.shared.batteryLevel)
+        }
         updateStatusItemBattery(level: BatteryMonitor.shared.batteryLevel)
 
         // Start event tap based on persisted setting
@@ -69,6 +75,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         eventTapManager.stop()
+        if let profileObserver { NotificationCenter.default.removeObserver(profileObserver) }
     }
 
     @objc private func togglePopover(_ sender: Any?) {
@@ -103,12 +110,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func updateStatusItemBattery(level: Int?) {
         guard let button = statusItem.button else { return }
         let hasImage = (button.image != nil)
+        let profile = ConfigManager.shared.currentProfileName
         if let lvl = level {
-            button.title = (hasImage ? " " : "🖱️ ") + "\(lvl)%"
-            button.toolTip = "Naga battery: \(lvl)%"
+            button.title = (hasImage ? " " : "🖱️ ") + "\(lvl)% · \(profile)"
+            button.toolTip = "Naga battery: \(lvl)% · Profile: \(profile)"
         } else {
-            button.title = hasImage ? "" : "🖱️"
-            button.toolTip = "Naga battery: —"
+            button.title = (hasImage ? " " : "🖱️ ") + profile
+            button.toolTip = "Naga battery: — · Profile: \(profile)"
         }
     }
 
