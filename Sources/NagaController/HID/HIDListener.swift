@@ -235,6 +235,11 @@ final class HIDListener {
             if id == 5 && length >= 5 {
                 // Byte 3-4 is DPI (Big Endian)
                 let currentDPI = (Int(report[3]) << 8) | Int(report[4])
+
+                // Reports with the same ID occasionally carry non-DPI payloads (seen 513 and
+                // 58880 around a reconnect). Ignore anything outside a plausible DPI range so a
+                // bogus sample can't flip the up/down direction of the next real press.
+                guard (100...30000).contains(currentDPI) else { return }
                 
                 var usage: UInt32 = 0
                 if let prev = lastDPI {
