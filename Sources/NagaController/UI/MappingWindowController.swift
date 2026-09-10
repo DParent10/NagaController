@@ -7,6 +7,11 @@ final class MappingWindowController: NSWindowController, NSWindowDelegate {
     private init() {
         let vc = MappingViewController()
         let window = NSWindow(contentViewController: vc)
+        // The mapping UI and the action editor sheet are styled for a dark background
+        // (white labels on glass). Sheets inherit the window's appearance, not the
+        // content view's, so pin the window itself or the editor goes unreadable in
+        // Light mode.
+        window.appearance = NSAppearance(named: .darkAqua)
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.title = "NagaController — Button Mappings"
         window.titleVisibility = .hidden

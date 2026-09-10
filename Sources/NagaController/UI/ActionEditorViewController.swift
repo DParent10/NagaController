@@ -171,6 +171,7 @@ final class ActionEditorViewController: NSViewController {
 
     override func loadView() {
         let glassyView = UIStyle.makeGlassyView()
+        glassyView.appearance = NSAppearance(named: .darkAqua)
         self.view = glassyView
         
         let container = NSView()
@@ -390,27 +391,42 @@ final class ActionEditorViewController: NSViewController {
         learnButton.target = self
         learnButton.action = #selector(learnHardwareTapped)
         UIStyle.styleSecondaryButton(learnButton)
-        learnButton.widthAnchor.constraint(equalToConstant: 190).isActive = true
-        learnButton.heightAnchor.constraint(equalToConstant: 28).isActive = true
+        learnButton.widthAnchor.constraint(equalToConstant: 200).isActive = true
+        learnButton.heightAnchor.constraint(equalToConstant: 30).isActive = true
+        learnButton.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.16).cgColor
+        learnButton.layer?.borderColor = NSColor.white.withAlphaComponent(0.5).cgColor
         
         clearHardwareButton.target = self
         clearHardwareButton.action = #selector(clearHardwareTapped)
         clearHardwareButton.image = UIStyle.symbol("xmark.circle.fill", size: 14)
         clearHardwareButton.isBordered = false
         
-        hardwareBindingLabel.font = .systemFont(ofSize: 11)
-        hardwareBindingLabel.textColor = NSColor.white.withAlphaComponent(0.3)
-        
-        let hardwareStack = NSStackView(views: [hardwareBindingLabel, learnButton, clearHardwareButton])
+        hardwareBindingLabel.font = .systemFont(ofSize: 12)
+        hardwareBindingLabel.textColor = NSColor.white.withAlphaComponent(0.7)
+        hardwareBindingLabel.lineBreakMode = .byTruncatingTail
+        hardwareBindingLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        // The hardware trigger row gets its own line: sharing the Cancel/Save row left
+        // the "Trigger:" label with no room and it was truncated to nothing.
+        let hardwareCaption = NSTextField(labelWithString: "HARDWARE TRIGGER")
+        hardwareCaption.font = .systemFont(ofSize: 11, weight: .black)
+        hardwareCaption.textColor = NSColor.white.withAlphaComponent(0.3)
+        let hardwareStack = NSStackView(views: [learnButton, clearHardwareButton, hardwareBindingLabel, NSView()])
         hardwareStack.spacing = 10
         hardwareStack.alignment = .centerY
+        let hardwareRow = NSStackView(views: [hardwareCaption, hardwareStack])
+        hardwareRow.orientation = .vertical
+        hardwareRow.alignment = .leading
+        hardwareRow.spacing = 8
+        hardwareStack.widthAnchor.constraint(equalTo: hardwareRow.widthAnchor).isActive = true
 
-        buttonsStack.addArrangedSubview(hardwareStack)
         buttonsStack.addArrangedSubview(NSView()) // Spacer
         buttonsStack.addArrangedSubview(cancelButton)
         buttonsStack.addArrangedSubview(saveButton)
 
         container.addSubview(header)
+        container.addSubview(hardwareRow)
+        hardwareRow.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(layerSegmented)
         container.addSubview(segmented)
         container.addSubview(descStack)
@@ -437,7 +453,11 @@ final class ActionEditorViewController: NSViewController {
             contentStack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 32),
             contentStack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -32),
 
-            buttonsStack.topAnchor.constraint(greaterThanOrEqualTo: contentStack.bottomAnchor, constant: 32),
+            hardwareRow.topAnchor.constraint(greaterThanOrEqualTo: contentStack.bottomAnchor, constant: 24),
+            hardwareRow.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 32),
+            hardwareRow.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -32),
+
+            buttonsStack.topAnchor.constraint(equalTo: hardwareRow.bottomAnchor, constant: 20),
             buttonsStack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 32),
             buttonsStack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -32),
             buttonsStack.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -32),
