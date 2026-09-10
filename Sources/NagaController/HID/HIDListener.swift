@@ -15,10 +15,7 @@ final class HIDListener {
     // Consider a HID press "recent" within this time window (seconds)
     // Increased to account for scheduling/processing latency between HID and event tap
     private let recentWindow: TimeInterval = 1.00
-    private let dpiUpCookie: IOHIDElementCookie = IOHIDElementCookie(0x26b)
-    private let dpiDownCookie: IOHIDElementCookie = IOHIDElementCookie(0x26d)
     private var syntheticStates: [Int: Bool] = [:]
-    private var lastButtonIndexForCookie: [UInt32: Int] = [:]
     
     private var learningCallback: ((UInt32, UInt32, IOHIDElementCookie, Int32, Int, Int) -> Void)?
 
@@ -30,10 +27,11 @@ final class HIDListener {
     private init() {
         manager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
 
-        // Restrict: match only known vendors; still filter by product name fallback in callback
-        // Match ALL HID interfaces from these vendors
-        // TEMP: Match EVERYTHING to find the missing Naga interfaces
-        let matches: [[String: Any]] = [[:]] 
+        // Deliberately match every HID device rather than only known vendors.
+        // "Learn Hardware Trigger" and device-bound bindings need events from
+        // non-whitelisted mice to reach handle(value:), which then gates on
+        // isWhitelistedMouse || isLearning || hasBinding before acting on anything.
+        let matches: [[String: Any]] = [[:]]
         IOHIDManagerSetDeviceMatchingMultiple(manager, matches as CFArray)
 
         IOHIDManagerRegisterDeviceMatchingCallback(manager, { context, result, sender, device in
@@ -102,25 +100,24 @@ final class HIDListener {
         // Ignore invalid usages often sent as padding or error states
         guard usage != 0xffffffff && usage != 0 else { return }
 
+        // Pointer movement (X/Y/wheel) arrives at polling rate from every matched device;
+        // bail out before doing any per-event device property lookups.
+        let isMovement = (usagePage == 0x01 && (usage == 0x30 || usage == 0x31 || usage == 0x38))
+        if isMovement { return }
+
         let device = IOHIDElementGetDevice(element)
-        let product = (IOHIDDeviceGetProperty(device, kIOHIDProductKey as CFString) as? String) ?? "<unknown>"
-        
-        let ptr = Unmanaged.passUnretained(device).toOpaque()
         let isLearning = queue.sync { learningCallback != nil }
         let isWhitelistedMouse = HIDListener.isWhitelistedMouse(device: device)
         let vendor = HIDListener.vendorID(device: device) ?? 0
         let productID = (IOHIDDeviceGetProperty(device, kIOHIDProductIDKey as CFString) as? Int) ?? 0
 
+        #if DEBUG
         // NUCLEAR LOGGING: Every non-movement event from EVERY device
-        let isMovement = (usagePage == 0x01 && (usage == 0x30 || usage == 0x31 || usage == 0x38))
-        if !isMovement {
-            #if DEBUG
-            let valStr = pressedValue != 0 ? "\(pressedValue)" : String(format: "%.3f", scaledValue)
-            NSLog("[HID] NUCLEAR EVENT: [\(ptr)] pg=0x\(String(usagePage, radix: 16)), us=0x\(String(usage, radix: 16)), val=\(valStr), prod=\(product) (\(isWhitelistedMouse ? "WHITELISTED" : "OTHER"))")
-            #endif
-        }
-
-        if isMovement { return }
+        let product = (IOHIDDeviceGetProperty(device, kIOHIDProductKey as CFString) as? String) ?? "<unknown>"
+        let ptr = Unmanaged.passUnretained(device).toOpaque()
+        let valStr = pressedValue != 0 ? "\(pressedValue)" : String(format: "%.3f", scaledValue)
+        NSLog("[HID] NUCLEAR EVENT: [\(ptr)] pg=0x\(String(usagePage, radix: 16)), us=0x\(String(usage, radix: 16)), val=\(valStr), prod=\(product) (\(isWhitelistedMouse ? "WHITELISTED" : "OTHER"))")
+        #endif
 
         let activeVal = (abs(scaledValue) > 0.1) ? Int32(round(scaledValue)) : Int32(pressedValue)
 
@@ -233,9 +230,6 @@ final class HIDListener {
         let product = (IOHIDDeviceGetProperty(device, kIOHIDProductKey as CFString) as? String) ?? "<unknown>"
         
         if product.lowercased().contains("naga") {
-            let bytes = UnsafeBufferPointer(start: report, count: length)
-            let hex = bytes.map { String(format: "%02x", $0) }.joined(separator: " ")
-            
             if id == 5 && length >= 5 {
                 // Byte 3-4 is DPI (Big Endian)
                 let currentDPI = (Int(report[3]) << 8) | Int(report[4])
@@ -264,7 +258,11 @@ final class HIDListener {
                 
                 lastDPI = currentDPI
             } else if id == 1 || id == 4 {
+                #if DEBUG
+                let bytes = UnsafeBufferPointer(start: report, count: length)
+                let hex = bytes.map { String(format: "%02x", $0) }.joined(separator: " ")
                 NSLog("[HID] RAW REPORT: [ID=\(id)] Len=\(length), Data=\(hex)")
+                #endif
             }
         }
     }
