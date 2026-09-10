@@ -28,6 +28,17 @@ final class ButtonMapper {
         return flags
     }
 
+    /// Stamped into `eventSourceUserData` on every event this app synthesizes, so the
+    /// event tap can tell them apart from the mouse's own keystrokes. Without this, a
+    /// mapping whose output is one of the Naga's own keys (1-0, -, =, e.g. Cmd+1) was
+    /// swallowed by our own tap as an auto-repeat of the button that triggered it.
+    static let syntheticEventTag: Int64 = 0x4E41_4741 // "NAGA"
+
+    private func post(_ event: CGEvent) {
+        event.setIntegerValueField(.eventSourceUserData, value: ButtonMapper.syntheticEventTag)
+        event.post(tap: .cghidEventTap)
+    }
+
     // Allow external configuration to replace the mapping
     func updateMapping(_ newMapping: [Int: ActionType]) {
         self.mapping = newMapping
@@ -92,7 +103,7 @@ final class ButtonMapper {
                     if let event = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: true) { // FlagsChanged is usually handled by virtualKey + flags
                         event.type = .flagsChanged
                         event.flags = currentModifierFlags
-                        event.post(tap: .cghidEventTap)
+                        post(event)
                         NSLog("[Mapping] Modifier hold start: button \(buttonIndex) -> \(stroke.displayLabel), cumulative flags: \(event.flags)")
                     }
                     return
@@ -101,7 +112,7 @@ final class ButtonMapper {
                 let flags = modifierFlags(from: stroke.modifiers)
                 if let code = keyCode, let eventDown = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: true) {
                     eventDown.flags = flags
-                    eventDown.post(tap: .cghidEventTap)
+                    post(eventDown)
                     activeHolds[buttonIndex] = (code, flags)
                     NSLog("[Mapping] Hold start for button \(buttonIndex) -> key=\(stroke.displayLabel), flags=\(flags)")
                 } else {
@@ -142,7 +153,7 @@ final class ButtonMapper {
                 if let event = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: false) {
                     event.type = .flagsChanged
                     event.flags = currentModifierFlags
-                    event.post(tap: .cghidEventTap)
+                    post(event)
                     NSLog("[Mapping] Modifier hold end: button \(buttonIndex) -> \(stroke.displayLabel), cumulative flags: \(event.flags)")
                 }
             }
@@ -152,7 +163,7 @@ final class ButtonMapper {
         if let (keyCode, flags) = activeHolds.removeValue(forKey: buttonIndex) {
             if let eventUp = CGEvent(keyboardEventSource: nil, virtualKey: keyCode, keyDown: false) {
                 eventUp.flags = flags
-                eventUp.post(tap: .cghidEventTap)
+                post(eventUp)
                 NSLog("[Mapping] Hold end for button \(buttonIndex)")
             }
         }
@@ -190,13 +201,13 @@ final class ButtonMapper {
             // Virtual key 103 = kVK_F11, the macOS default "Show Desktop" key.
             // Using CGEvent mirrors exactly what the previous osascript was doing
             // but without a shell process or permission friction.
-            if let eventDown = CGEvent(keyboardEventSource: nil, virtualKey: 103, keyDown: true) { eventDown.post(tap: .cghidEventTap) }
-            if let eventUp = CGEvent(keyboardEventSource: nil, virtualKey: 103, keyDown: false) { eventUp.post(tap: .cghidEventTap) }
+            if let eventDown = CGEvent(keyboardEventSource: nil, virtualKey: 103, keyDown: true) { post(eventDown) }
+            if let eventUp = CGEvent(keyboardEventSource: nil, virtualKey: 103, keyDown: false) { post(eventUp) }
             return
         case .missionControl:
             // Virtual key 160 = NX_KEYTYPE_MISSION_CONTROL mapped through the HID system.
-            if let eventDown = CGEvent(keyboardEventSource: nil, virtualKey: 160, keyDown: true) { eventDown.post(tap: .cghidEventTap) }
-            if let eventUp = CGEvent(keyboardEventSource: nil, virtualKey: 160, keyDown: false) { eventUp.post(tap: .cghidEventTap) }
+            if let eventDown = CGEvent(keyboardEventSource: nil, virtualKey: 160, keyDown: true) { post(eventDown) }
+            if let eventUp = CGEvent(keyboardEventSource: nil, virtualKey: 160, keyDown: false) { post(eventUp) }
             return
         default: break
         }
@@ -226,8 +237,8 @@ final class ButtonMapper {
             data2: -1
         )
 
-        keyDown?.cgEvent?.post(tap: CGEventTapLocation.cghidEventTap)
-        keyUp?.cgEvent?.post(tap: CGEventTapLocation.cghidEventTap)
+        if let e = keyDown?.cgEvent { post(e) }
+        if let e = keyUp?.cgEvent { post(e) }
     }
 
     private func sendKeyStroke(_ stroke: KeyStroke) {
@@ -239,12 +250,12 @@ final class ButtonMapper {
         // Key down
         if let eventDown = CGEvent(keyboardEventSource: nil, virtualKey: keyCode, keyDown: true) {
             eventDown.flags = flags
-            eventDown.post(tap: .cghidEventTap)
+            post(eventDown)
         }
         // Key up
         if let eventUp = CGEvent(keyboardEventSource: nil, virtualKey: keyCode, keyDown: false) {
             eventUp.flags = flags
-            eventUp.post(tap: .cghidEventTap)
+            post(eventUp)
         }
     }
 

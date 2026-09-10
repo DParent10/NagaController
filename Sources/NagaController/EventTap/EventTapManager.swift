@@ -116,6 +116,11 @@ final class EventTapManager {
             event.flags = event.flags.union(mouseMods)
         }
 
+        // Events we synthesized ourselves must never be re-interpreted as Naga presses.
+        if event.getIntegerValueField(.eventSourceUserData) == ButtonMapper.syntheticEventTag {
+            return Unmanaged.passUnretained(event)
+        }
+
         // Only handle remapping/blocking logic for keyboard events
         guard type == .keyDown || type == .keyUp || type == .flagsChanged else {
             return Unmanaged.passUnretained(event)
