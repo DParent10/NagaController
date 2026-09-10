@@ -68,6 +68,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         updateStatusItemBattery(level: BatteryMonitor.shared.batteryLevel)
 
+        // First launch: the app has no window or Dock icon, so open the popover once to
+        // show where it lives. If the status item didn't make it onto the menu bar (a full
+        // menu bar on a notched MacBook hides items), fall back to an alert.
+        let firstLaunchKey = "NagaController.didShowFirstLaunchPopover"
+        if !UserDefaults.standard.bool(forKey: firstLaunchKey) {
+            UserDefaults.standard.set(true, forKey: firstLaunchKey)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                self?.showFirstLaunchHint()
+            }
+        }
+
         // Start event tap based on persisted setting
         let remapEnabled = ConfigManager.shared.getRemappingEnabled()
         eventTapManager.start(listenOnly: !remapEnabled)
@@ -76,6 +87,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         eventTapManager.stop()
         if let profileObserver { NotificationCenter.default.removeObserver(profileObserver) }
+    }
+
+    private func showFirstLaunchHint() {
+        NSApp.activate(ignoringOtherApps: true)
+        if let button = statusItem.button, button.window?.isVisible == true, !popover.isShown {
+            togglePopover(nil)
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText = "NagaController runs in the menu bar"
+        alert.informativeText = "There is no window or Dock icon. Look for the mouse icon in the menu bar to enable remapping and configure buttons. If you don't see it, your menu bar may be full; remove or hide a few other items so it fits."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 
     @objc private func togglePopover(_ sender: Any?) {
