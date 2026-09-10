@@ -4,7 +4,7 @@
 
 A macOS menu bar app to remap the 12 side buttons of the Razer Naga V2 Hyperspeed. Intercepts the default 1–0–=– key events and maps them to actions like key sequences, app launching, and macros. Includes Bluetooth battery level display.
 
-**[⬇️ Download Latest Release (v0.1.0)](https://github.com/DParent10/NagaController/releases/latest)**
+**[⬇️ Download Latest Release (v0.2.0)](https://github.com/DParent10/NagaController/releases/latest)**
 
 ## Features
 
@@ -26,7 +26,7 @@ A macOS menu bar app to remap the 12 side buttons of the Razer Naga V2 Hyperspee
 
 ## Installation
 
-1. Download `NagaController-v0.1.0.dmg` from [Releases](https://github.com/DParent10/NagaController/releases/latest)
+1. Download `NagaController-v0.2.0.dmg` from [Releases](https://github.com/DParent10/NagaController/releases/latest)
 2. Open the DMG file
 3. Drag `NagaController.app` to the Applications folder
 4. Double-click `NagaController.app` to launch

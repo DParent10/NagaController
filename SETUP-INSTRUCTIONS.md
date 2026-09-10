@@ -39,7 +39,7 @@ This will:
 
 ```bash
 # Mount the DMG
-open NagaController-v0.1.0.dmg
+open NagaController-v0.2.0.dmg
 ```
 
 You should see:
@@ -81,7 +81,7 @@ create-dmg \
   --icon-size 160 \
   --icon "NagaController.app" 180 170 \
   --app-drop-link 480 170 \
-  "NagaController-v0.1.0.dmg" \
+  "NagaController-v0.2.0.dmg" \
   "NagaController.app"
 ```
 
@@ -89,13 +89,13 @@ create-dmg \
 
 ```bash
 # Sign DMG
-codesign --sign "Developer ID Application: Devin Parent (SUT6Y24T2J)" NagaController-v0.1.0.dmg
+codesign --sign "Developer ID Application: Devin Parent (SUT6Y24T2J)" NagaController-v0.2.0.dmg
 
 # Notarize
-xcrun notarytool submit NagaController-v0.1.0.dmg --keychain-profile "notary-profile" --wait
+xcrun notarytool submit NagaController-v0.2.0.dmg --keychain-profile "notary-profile" --wait
 
 # Staple
-xcrun stapler staple NagaController-v0.1.0.dmg
+xcrun stapler staple NagaController-v0.2.0.dmg
 ```
 
 ## Result:

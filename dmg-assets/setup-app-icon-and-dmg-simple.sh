@@ -10,6 +10,9 @@ echo "🎨 Setting up NagaController icon and DMG background..."
 # Get the project root (parent of dmg-assets)
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APP_BUNDLE="$PROJECT_ROOT/NagaController.app"
+# Release version comes from the built app so this script never needs editing per release
+VERSION="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_BUNDLE/Contents/Info.plist" 2>/dev/null || echo 0.0.0)"
+DMG_PATH="$PROJECT_ROOT/NagaController-v${VERSION}.dmg"
 
 # Check if app bundle exists
 if [ ! -d "$APP_BUNDLE" ]; then
@@ -68,7 +71,7 @@ echo "🎨 Creating DMG with custom background..."
 codesign --force --deep --sign "Developer ID Application: Devin Parent (SUT6Y24T2J)" --options runtime "$APP_BUNDLE"
 
 # Remove old DMG if exists
-rm -f "$PROJECT_ROOT/NagaController-v0.1.0.dmg"
+rm -f "$DMG_PATH"
 
 # Create DMG
 create-dmg \
@@ -82,13 +85,13 @@ create-dmg \
   --hide-extension "NagaController.app" \
   --app-drop-link 480 170 \
   --no-internet-enable \
-  "$PROJECT_ROOT/NagaController-v0.1.0.dmg" \
+  "$DMG_PATH" \
   "$APP_BUNDLE" || {
     echo "Note: create-dmg may show errors but often succeeds anyway"
   }
 
 # Check if DMG was created
-if [ ! -f "$PROJECT_ROOT/NagaController-v0.1.0.dmg" ]; then
+if [ ! -f "$DMG_PATH" ]; then
     echo "❌ DMG creation failed"
     exit 1
 fi
@@ -98,17 +101,17 @@ echo ""
 echo "🔐 Signing and notarizing DMG..."
 
 # Sign the DMG
-codesign --sign "Developer ID Application: Devin Parent (SUT6Y24T2J)" "$PROJECT_ROOT/NagaController-v0.1.0.dmg"
+codesign --sign "Developer ID Application: Devin Parent (SUT6Y24T2J)" "$DMG_PATH"
 
 # Notarize the DMG
 echo "Submitting for notarization (this may take a few minutes)..."
-xcrun notarytool submit "$PROJECT_ROOT/NagaController-v0.1.0.dmg" --keychain-profile "notary-profile" --wait
+xcrun notarytool submit "$DMG_PATH" --keychain-profile "notary-profile" --wait
 
 # Staple the notarization
-xcrun stapler staple "$PROJECT_ROOT/NagaController-v0.1.0.dmg"
+xcrun stapler staple "$DMG_PATH"
 
 echo ""
 echo "✅ Done! Your signed and notarized DMG is ready:"
-echo "   📦 $PROJECT_ROOT/NagaController-v0.1.0.dmg"
+echo "   📦 $DMG_PATH"
 echo ""
-echo "Test it: open NagaController-v0.1.0.dmg"
+echo "Test it: open $DMG_PATH"
