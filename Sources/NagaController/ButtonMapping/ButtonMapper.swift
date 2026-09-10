@@ -4,20 +4,39 @@ import Carbon.HIToolbox
 final class ButtonMapper {
     static let shared = ButtonMapper()
 
-    // Temporary in-memory mapping for Phase 1
-    // 1 -> Cmd+C, 2 -> Cmd+V, others log only
-    private var mapping: [Int: ActionType] = [
-        1: .keySequence(keys: [KeyStroke(key: "c", modifiers: ["cmd"])], description: "Copy"),
-        2: .keySequence(keys: [KeyStroke(key: "v", modifiers: ["cmd"])], description: "Paste")
-    ]
+    private var mapping: [Int: ActionType] = [:]
+    private var hypershiftMapping: [Int: ActionType] = [:]
+    private var hypershiftHolders: Set<Int> = []
+    private var isHypershiftToggled: Bool = false
+    private var lastHypershiftPressTime: CFAbsoluteTime = 0
+    
+    private var isHypershiftActive: Bool {
+        return !hypershiftHolders.isEmpty || isHypershiftToggled
+    }
 
     // Track active press-and-hold mappings (buttonIndex -> (keyCode, flags))
     private var activeHolds: [Int: (CGKeyCode, CGEventFlags)] = [:]
+    
+    // Track standalone modifiers held by mouse buttons (buttonIndex -> modifier flag)
+    private var activeModifiers: [Int: CGEventFlags] = [:]
+    
+    var currentModifierFlags: CGEventFlags {
+        var flags: CGEventFlags = []
+        for f in activeModifiers.values {
+            flags.insert(f)
+        }
+        return flags
+    }
 
     // Allow external configuration to replace the mapping
     func updateMapping(_ newMapping: [Int: ActionType]) {
         self.mapping = newMapping
         NSLog("[Mapping] Updated mapping for \(newMapping.count) button(s)")
+    }
+
+    func updateHypershiftMapping(_ newMapping: [Int: ActionType]) {
+        self.hypershiftMapping = newMapping
+        NSLog("[Mapping] Updated hypershift mapping for \(newMapping.count) button(s)")
     }
 
     func handle(buttonIndex: Int) {
@@ -30,14 +49,55 @@ final class ButtonMapper {
 
     // Handle physical button press (down). For single-key mappings, send keyDown and remember for hold.
     func handlePress(buttonIndex: Int) {
-        guard let action = mapping[buttonIndex] else {
+        // Handle hypershift button
+        if let baseAction = mapping[buttonIndex], case .hypershift(let mode) = baseAction {
+            if mode == .hold {
+                hypershiftHolders.insert(buttonIndex)
+                NSLog("[Mapping] Hypershift activated (physically held by button \(buttonIndex))")
+            } else if mode == .toggle {
+                isHypershiftToggled.toggle()
+                NSLog("[Mapping] Hypershift toggled to \(isHypershiftToggled) by button \(buttonIndex)")
+            }
+            lastHypershiftPressTime = CFAbsoluteTimeGetCurrent()
+            return
+        }
+
+        let actionToPerform: ActionType?
+        if isHypershiftActive {
+            if let hAction = hypershiftMapping[buttonIndex] {
+                actionToPerform = hAction
+                NSLog("[Mapping] Button \(buttonIndex) matched Hypershift mapping: \(hAction)")
+            } else {
+                actionToPerform = mapping[buttonIndex]
+                NSLog("[Mapping] Button \(buttonIndex) fallback to Standard mapping (Hypershift active but no specific mapping): \(String(describing: actionToPerform))")
+            }
+        } else {
+            actionToPerform = mapping[buttonIndex]
+            NSLog("[Mapping] Button \(buttonIndex) Standard mapping: \(String(describing: actionToPerform))")
+        }
+
+        guard let action = actionToPerform else {
             NSLog("[Mapping] No action mapped for button \(buttonIndex).")
             return
         }
+        
         switch action {
         case .keySequence(let keys, _):
             if let stroke = keys.first, keys.count == 1 {
                 let keyCode = effectiveKeyCode(for: stroke)
+                
+                // NEW: Standalone modifier support (Shift, CMD, etc.)
+                if let code = keyCode, let modFlag = modifierFlag(for: code), stroke.modifiers.isEmpty {
+                    activeModifiers[buttonIndex] = modFlag
+                    if let event = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: true) { // FlagsChanged is usually handled by virtualKey + flags
+                        event.type = .flagsChanged
+                        event.flags = currentModifierFlags
+                        event.post(tap: .cghidEventTap)
+                        NSLog("[Mapping] Modifier hold start: button \(buttonIndex) -> \(stroke.displayLabel), cumulative flags: \(event.flags)")
+                    }
+                    return
+                }
+
                 let flags = modifierFlags(from: stroke.modifiers)
                 if let code = keyCode, let eventDown = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: true) {
                     eventDown.flags = flags
@@ -58,6 +118,37 @@ final class ButtonMapper {
 
     // Handle physical button release (up). If we are holding, send keyUp and clear state.
     func handleRelease(buttonIndex: Int) {
+        if let baseAction = mapping[buttonIndex], case .hypershift(let mode) = baseAction {
+            if mode == .hold {
+                hypershiftHolders.remove(buttonIndex)
+                NSLog("[Mapping] Hypershift HELD -> Released. holders=\(hypershiftHolders.count)")
+            } else if mode == .toggle {
+                // Long-hold (> 0.5s) force-deactivates Hypershift, giving users an escape hatch.
+                // Short taps still behave as normal toggle (on/off).
+                let holdDuration = CFAbsoluteTimeGetCurrent() - lastHypershiftPressTime
+                if holdDuration > 0.5, isHypershiftToggled {
+                    isHypershiftToggled = false
+                    NSLog("[Mapping] Hypershift TOGGLE force-deactivated via long hold (\(String(format: "%.2f", holdDuration))s)")
+                }
+            }
+            return
+        }
+
+        // Release standalone modifiers
+        if let _ = activeModifiers.removeValue(forKey: buttonIndex) {
+            // Find keycode from mapping if possible
+            let action = isHypershiftActive ? (hypershiftMapping[buttonIndex] ?? mapping[buttonIndex]) : mapping[buttonIndex]
+            if case .keySequence(let keys, _) = action, let stroke = keys.first, let code = effectiveKeyCode(for: stroke) {
+                if let event = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: false) {
+                    event.type = .flagsChanged
+                    event.flags = currentModifierFlags
+                    event.post(tap: .cghidEventTap)
+                    NSLog("[Mapping] Modifier hold end: button \(buttonIndex) -> \(stroke.displayLabel), cumulative flags: \(event.flags)")
+                }
+            }
+            return
+        }
+        
         if let (keyCode, flags) = activeHolds.removeValue(forKey: buttonIndex) {
             if let eventUp = CGEvent(keyboardEventSource: nil, virtualKey: keyCode, keyDown: false) {
                 eventUp.flags = flags
@@ -82,8 +173,61 @@ final class ButtonMapper {
         case .macro(let steps, _):
             runMacro(steps)
         case .profileSwitch(let profile, _):
-            NSLog("[Mapping] Switch to profile: \(profile) (not implemented)")
+            ConfigManager.shared.setCurrentProfile(profile)
+        case .hypershift(_):
+            break
+        case .mediaKey(let key, _):
+            sendMediaKey(key)
         }
+    }
+
+    private func sendMediaKey(_ key: MediaKeyType) {
+        // Handle non-media special OS keys via native CGEvent emulation.
+        // Both cases post a raw virtualKey down+up pair directly to the HID event tap,
+        // avoiding shell subprocesses, AppleScript overhead, and sandbox restrictions.
+        switch key {
+        case .showDesktop:
+            // Virtual key 103 = kVK_F11, the macOS default "Show Desktop" key.
+            // Using CGEvent mirrors exactly what the previous osascript was doing
+            // but without a shell process or permission friction.
+            if let eventDown = CGEvent(keyboardEventSource: nil, virtualKey: 103, keyDown: true) { eventDown.post(tap: .cghidEventTap) }
+            if let eventUp = CGEvent(keyboardEventSource: nil, virtualKey: 103, keyDown: false) { eventUp.post(tap: .cghidEventTap) }
+            return
+        case .missionControl:
+            // Virtual key 160 = NX_KEYTYPE_MISSION_CONTROL mapped through the HID system.
+            if let eventDown = CGEvent(keyboardEventSource: nil, virtualKey: 160, keyDown: true) { eventDown.post(tap: .cghidEventTap) }
+            if let eventUp = CGEvent(keyboardEventSource: nil, virtualKey: 160, keyDown: false) { eventUp.post(tap: .cghidEventTap) }
+            return
+        default: break
+        }
+
+        // True NX_SYSDEFINED media keys
+        let EV_KEY: Int16 = 8 // NX_SYSDEFINED
+        let keyDown = NSEvent.otherEvent(
+            with: .systemDefined,
+            location: .zero,
+            modifierFlags: NSEvent.ModifierFlags(rawValue: 0xa00), // Key down magic flags
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            subtype: EV_KEY,
+            data1: Int((key.rawValue << 16) | (0xa << 8)), // Key down
+            data2: -1
+        )
+        let keyUp = NSEvent.otherEvent(
+            with: .systemDefined,
+            location: .zero,
+            modifierFlags: NSEvent.ModifierFlags(rawValue: 0xb00), // Key up magic flags
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            subtype: EV_KEY,
+            data1: Int((key.rawValue << 16) | (0xb << 8)), // Key up
+            data2: -1
+        )
+
+        keyDown?.cgEvent?.post(tap: CGEventTapLocation.cghidEventTap)
+        keyUp?.cgEvent?.post(tap: CGEventTapLocation.cghidEventTap)
     }
 
     private func sendKeyStroke(_ stroke: KeyStroke) {
@@ -124,6 +268,17 @@ final class ButtonMapper {
             }
         }
         return flags
+    }
+
+    private func modifierFlag(for keyCode: CGKeyCode) -> CGEventFlags? {
+        switch Int(keyCode) {
+        case kVK_Command: return .maskCommand
+        case kVK_Shift: return .maskShift
+        case kVK_Option: return .maskAlternate
+        case kVK_Control: return .maskControl
+        case kVK_Function: return .maskSecondaryFn
+        default: return nil
+        }
     }
 
     private func runShell(_ command: String) {

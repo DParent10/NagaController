@@ -59,7 +59,7 @@ final class MainViewController: NSViewController {
         return label
     }()
 
-    private let inputMonitoringStatusLabel: NSTextField = {
+    private let inputmonitoringStatusLabel: NSTextField = {
         let label = NSTextField(labelWithString: "Checking…")
         label.font = .systemFont(ofSize: 12)
         label.alignment = .right
@@ -67,122 +67,140 @@ final class MainViewController: NSViewController {
     }()
 
     override func loadView() {
-        // Root solid black view for popover content
-        let container = NSView()
-        container.wantsLayer = true
-        container.layer?.cornerRadius = 14
-        container.layer?.masksToBounds = true
-        container.layer?.backgroundColor = NSColor.black.cgColor
-        // Subtle drop shadow
-        container.shadow = NSShadow()
-        container.shadow?.shadowColor = NSColor.black.withAlphaComponent(0.15)
-        container.shadow?.shadowBlurRadius = 20
-        container.shadow?.shadowOffset = NSSize(width: 0, height: -2)
+        // Base container with glassy effect (darker material for contrast)
+        let glassyView = UIStyle.makeGlassyView()
+        self.view = glassyView
+        
+        let container = NSStackView()
+        container.orientation = .vertical
+        container.spacing = 20
+        container.alignment = .centerX
+        container.edgeInsets = NSEdgeInsets(top: 24, left: 24, bottom: 24, right: 24)
+        container.translatesAutoresizingMaskIntoConstraints = false
+        glassyView.addSubview(container)
+        
+        NSLayoutConstraint.activate([
+            container.leadingAnchor.constraint(equalTo: glassyView.leadingAnchor),
+            container.trailingAnchor.constraint(equalTo: glassyView.trailingAnchor),
+            container.topAnchor.constraint(equalTo: glassyView.topAnchor),
+            container.bottomAnchor.constraint(equalTo: glassyView.bottomAnchor),
+            glassyView.widthAnchor.constraint(equalToConstant: 320)
+        ])
 
-        self.view = container
-        self.view.translatesAutoresizingMaskIntoConstraints = false
-        if #available(macOS 10.14, *) {
-            self.view.appearance = NSAppearance(named: .darkAqua)
-        }
+        // 1. Header Section
+        titleLabel.font = .systemFont(ofSize: 18, weight: .bold)
+        titleLabel.textColor = UIStyle.razerGreen
+        
+        let enabled = ConfigManager.shared.getRemappingEnabled()
+        statusLabel.stringValue = enabled ? "Remapping active" : "Listen-only mode"
+        statusLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+        statusLabel.textColor = .white
+        
+        let batteryRow = NSStackView(views: [batteryLabel, batteryGlass])
+        batteryRow.orientation = .horizontal
+        batteryRow.spacing = 8
+        batteryRow.alignment = .centerY
+        batteryLabel.textColor = NSColor.white.withAlphaComponent(0.6)
+        batteryGlass.widthAnchor.constraint(equalToConstant: 60).isActive = true
+        batteryGlass.heightAnchor.constraint(equalToConstant: 12).isActive = true
 
-        let stack = NSStackView()
-        stack.orientation = .vertical
-        stack.spacing = 8
-        stack.edgeInsets = NSEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
+        let headerStack = NSStackView(views: [titleLabel, statusLabel, batteryRow])
+        headerStack.orientation = .vertical
+        headerStack.spacing = 8
+        headerStack.alignment = .centerX
+        
+        container.addArrangedSubview(headerStack)
 
+        // 2. Actions Section (in a card)
+        let actionsCard = UIStyle.makeCard()
+        let actionsStack = NSStackView()
+        actionsStack.orientation = .vertical
+        actionsStack.spacing = 16
+        actionsStack.alignment = .centerX
+        actionsStack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
+        
+        // Target existing toggle action
         toggle.target = self
         toggle.action = #selector(toggleChanged(_:))
-
+        toggle.state = enabled ? .on : .off
+        toggle.font = .systemFont(ofSize: 13, weight: .medium)
+        toggle.contentTintColor = .white
+        
         configureButton.target = self
         configureButton.action = #selector(openMappings)
         UIStyle.stylePrimaryButton(configureButton)
-
-        quitButton.target = self
-        quitButton.action = #selector(quitApp)
+        configureButton.widthAnchor.constraint(equalToConstant: 220).isActive = true
+        configureButton.heightAnchor.constraint(equalToConstant: 36).isActive = true
+        
+        quitButton.target = NSApp
+        quitButton.action = #selector(NSApplication.terminate(_:))
         UIStyle.styleDangerButton(quitButton)
-
-        // Initialize from persisted setting
-        let enabled = ConfigManager.shared.getRemappingEnabled()
-        toggle.state = enabled ? .on : .off
-        statusLabel.stringValue = enabled ? "Remapping enabled" : "Listen-only mode"
-        if #available(macOS 10.14, *) {
-            titleLabel.textColor = .white
-            statusLabel.textColor = .white
-            batteryLabel.textColor = .white
-        }
-
-        // Controls inside a card
-        let controls = NSStackView()
-        controls.orientation = .vertical
-        controls.spacing = 8
-        controls.addArrangedSubview(toggle)
-        controls.addArrangedSubview(configureButton)
-
-        // Battery glass view next to the label
-        let batteryRow = NSStackView()
-        batteryRow.orientation = .horizontal
-        batteryRow.alignment = .centerY
-        batteryRow.spacing = 8
-        batteryGlass.translatesAutoresizingMaskIntoConstraints = false
-        batteryGlass.heightAnchor.constraint(equalToConstant: 10).isActive = true
-        batteryGlass.widthAnchor.constraint(equalToConstant: 60).isActive = true
-        batteryRow.addArrangedSubview(batteryLabel)
-        batteryRow.addArrangedSubview(batteryGlass)
-        controls.addArrangedSubview(quitButton)
-
-        controls.setCustomSpacing(12, after: configureButton)
-        controls.addArrangedSubview(makeSeparator())
-
-        let permissionsSection = NSStackView()
-        permissionsSection.orientation = .vertical
-        permissionsSection.spacing = 6
-        permissionsSection.addArrangedSubview(permissionHeaderLabel)
-        permissionsSection.addArrangedSubview(makePermissionRow(title: "Accessibility", statusLabel: accessibilityStatusLabel, selector: #selector(openAccessibilitySettings)))
-        permissionsSection.addArrangedSubview(makePermissionRow(title: "Input Monitoring", statusLabel: inputMonitoringStatusLabel, selector: #selector(openInputMonitoringSettings)))
-        controls.addArrangedSubview(permissionsSection)
-
-        let card = UIStyle.makeCard()
-        card.contentViewMargins = NSSize(width: 10, height: 10)
-        card.addSubview(controls)
-        controls.translatesAutoresizingMaskIntoConstraints = false
+        quitButton.widthAnchor.constraint(equalToConstant: 220).isActive = true
+        quitButton.heightAnchor.constraint(equalToConstant: 36).isActive = true
+        
+        let toggleContainer = NSStackView(views: [toggle])
+        toggleContainer.alignment = .centerX
+        toggleContainer.edgeInsets = NSEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
+        (toggle.cell as? NSButtonCell)?.wraps = true
+        toggleContainer.widthAnchor.constraint(lessThanOrEqualToConstant: 230).isActive = true
+        
+        actionsStack.addArrangedSubview(toggleContainer)
+        actionsStack.addArrangedSubview(configureButton)
+        actionsStack.addArrangedSubview(quitButton)
+        
+        actionsCard.addSubview(actionsStack)
+        actionsStack.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            controls.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 10),
-            controls.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -10),
-            controls.topAnchor.constraint(equalTo: card.topAnchor, constant: 10),
-            controls.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -10)
+            actionsStack.topAnchor.constraint(equalTo: actionsCard.topAnchor),
+            actionsStack.leadingAnchor.constraint(equalTo: actionsCard.leadingAnchor),
+            actionsStack.trailingAnchor.constraint(equalTo: actionsCard.trailingAnchor),
+            actionsStack.bottomAnchor.constraint(equalTo: actionsCard.bottomAnchor)
         ])
+        
+        container.addArrangedSubview(actionsCard)
 
-        stack.addArrangedSubview(titleLabel)
-        stack.addArrangedSubview(statusLabel)
-        stack.addArrangedSubview(batteryRow)
-        stack.addArrangedSubview(card)
-
-        view.addSubview(stack)
-        stack.translatesAutoresizingMaskIntoConstraints = false
+        // 3. Permissions Section
+        let permCard = UIStyle.makeCard()
+        let permStack = NSStackView()
+        permStack.orientation = .vertical
+        permStack.spacing = 12
+        permStack.alignment = .leading
+        permStack.edgeInsets = NSEdgeInsets(top: 16, left: 16, bottom: 16, right: 16)
+        
+        permissionHeaderLabel.font = .systemFont(ofSize: 11, weight: .black)
+        permissionHeaderLabel.textColor = NSColor.white.withAlphaComponent(0.3)
+        permStack.addArrangedSubview(permissionHeaderLabel)
+        
+        permStack.addArrangedSubview(makePermissionRow(title: "Accessibility", statusLabel: accessibilityStatusLabel, selector: #selector(openAccessibilitySettings)))
+        permStack.addArrangedSubview(makePermissionRow(title: "Input Monitoring", statusLabel: inputmonitoringStatusLabel, selector: #selector(openInputMonitoringSettings)))
+        
+        permCard.addSubview(permStack)
+        permStack.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            stack.topAnchor.constraint(equalTo: view.topAnchor),
-            stack.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            permStack.topAnchor.constraint(equalTo: permCard.topAnchor),
+            permStack.leadingAnchor.constraint(equalTo: permCard.leadingAnchor),
+            permStack.trailingAnchor.constraint(equalTo: permCard.trailingAnchor),
+            permStack.bottomAnchor.constraint(equalTo: permCard.bottomAnchor)
         ])
+        
+        container.addArrangedSubview(permCard)
 
-        // Initialize battery label and subscribe to updates
+        // Initial setup and observers
         updateBattery()
         batteryObserver = NotificationCenter.default.addObserver(forName: BatteryMonitor.didUpdateNotification, object: nil, queue: .main) { [weak self] _ in
             self?.updateBattery()
         }
-
         permissionObserver = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             self?.refreshPermissionStatuses()
         }
-
         refreshPermissionStatuses()
     }
 
     @objc private func toggleChanged(_ sender: NSButton) {
         let enabled = (sender.state == .on)
-        EventTapManager.shared.isRemappingEnabled = enabled
-        statusLabel.stringValue = enabled ? "Remapping enabled" : "Listen-only mode"
+        EventTapManager.shared.start(listenOnly: !enabled)
+        statusLabel.stringValue = enabled ? "Remapping active" : "Listen-only mode"
+        statusLabel.textColor = .white
         ConfigManager.shared.setRemappingEnabled(enabled)
     }
 
@@ -200,19 +218,19 @@ final class MainViewController: NSViewController {
             if level <= 20 {
                 batteryLabel.textColor = .systemRed
             } else {
-                batteryLabel.textColor = .secondaryLabelColor
+                batteryLabel.textColor = .white.withAlphaComponent(0.6)
             }
             batteryGlass.level = level
         } else {
             batteryLabel.stringValue = "Battery: —"
-            batteryLabel.textColor = .secondaryLabelColor
+            batteryLabel.textColor = .white.withAlphaComponent(0.6)
             batteryGlass.level = nil
         }
     }
 
     func refreshPermissionStatuses() {
         updateStatus(label: accessibilityStatusLabel, granted: PermissionManager.shared.hasAccessibilityPermission())
-        updateStatus(label: inputMonitoringStatusLabel, granted: PermissionManager.shared.hasInputMonitoringPermission())
+        updateStatus(label: inputmonitoringStatusLabel, granted: PermissionManager.shared.hasInputMonitoringPermission())
     }
 
     private func updateStatus(label: NSTextField, granted: Bool) {
@@ -232,15 +250,14 @@ final class MainViewController: NSViewController {
 
         let titleLabel = NSTextField(labelWithString: title)
         titleLabel.font = .systemFont(ofSize: 12)
-        if #available(macOS 10.14, *) {
-            titleLabel.textColor = .labelColor
-        }
+        titleLabel.textColor = .white
 
         let spacer = NSView()
 
         let button = NSButton(title: "Open Settings", target: self, action: selector)
-        button.setButtonType(.momentaryPushIn)
         UIStyle.styleSecondaryButton(button)
+        button.heightAnchor.constraint(equalToConstant: 24).isActive = true
+        button.widthAnchor.constraint(equalToConstant: 120).isActive = true
         button.setContentHuggingPriority(.required, for: .horizontal)
         button.setContentCompressionResistancePriority(.required, for: .horizontal)
 
@@ -281,4 +298,3 @@ final class MainViewController: NSViewController {
         }
     }
 }
-

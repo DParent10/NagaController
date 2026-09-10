@@ -4,8 +4,16 @@ import QuartzCore
 
 final class MappingViewController: NSViewController {
     private let headerLabel: NSTextField = {
-        let l = NSTextField(labelWithString: "Button Mappings — \(ConfigManager.shared.currentProfileName)")
-        l.font = .systemFont(ofSize: 16, weight: .semibold)
+        let l = NSTextField(labelWithString: ConfigManager.shared.currentProfileName)
+        l.font = .systemFont(ofSize: 32, weight: .bold)
+        l.textColor = UIStyle.razerGreen
+        return l
+    }()
+
+    private let subHeaderLabel: NSTextField = {
+        let l = NSTextField(labelWithString: "BUTTON MAPPING CONFIGURATION")
+        l.font = .systemFont(ofSize: 11, weight: .black)
+        l.textColor = NSColor.white.withAlphaComponent(0.3)
         return l
     }()
 
@@ -14,6 +22,8 @@ final class MappingViewController: NSViewController {
     private let saveButton: NSButton = NSButton(title: "Save", target: nil, action: nil)
     private let stack = NSStackView() // unused legacy
     private var grid: NSGridView?
+    private var isHypershiftView = false
+    private let hypershiftToggle = NSButton(title: "Hypershift", target: nil, action: nil)
 
     private var rowViews: [Int: NSView] = [:]
     private var descLabels: [Int: NSTextField] = [:]
@@ -39,23 +49,25 @@ final class MappingViewController: NSViewController {
             background.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
 
-        // Subtle razer-green gradient tint over black
+        // Subtle razer-green gradient tint over dark background
         let grad = CAGradientLayer()
         grad.colors = [
-            UIStyle.razerGreen.withAlphaComponent(0.10).cgColor,
+            UIStyle.razerGreen.withAlphaComponent(0.08).cgColor,
             NSColor.clear.cgColor
         ]
-        grad.startPoint = CGPoint(x: 0.0, y: 1.0)
-        grad.endPoint = CGPoint(x: 1.0, y: 0.0)
+        grad.startPoint = CGPoint(x: 0.1, y: 1.0)
+        grad.endPoint = CGPoint(x: 1.0, y: 0.1)
         background.layer?.insertSublayer(grad, at: 0)
         backgroundGradient = grad
+        
+        background.layer?.backgroundColor = UIStyle.backgroundDark.cgColor
 
         // Top bar with profile selector and save button
         let topBar = NSStackView()
         topBar.orientation = .horizontal
-        topBar.alignment = .firstBaseline
+        topBar.alignment = .centerY
         topBar.distribution = .fill
-        topBar.spacing = 8
+        topBar.spacing = 16
 
         let profileLabel = NSTextField(labelWithString: "Profile:")
         profileLabel.textColor = .white
@@ -72,20 +84,40 @@ final class MappingViewController: NSViewController {
         saveButton.imagePosition = .imageLeading
         saveButton.toolTip = "Save all changes to disk"
         UIStyle.stylePrimaryButton(saveButton)
+        saveButton.widthAnchor.constraint(equalToConstant: 96).isActive = true
+        saveButton.heightAnchor.constraint(equalToConstant: 32).isActive = true
 
-        topBar.addArrangedSubview(headerLabel)
+        let titlesStack = NSStackView(views: [headerLabel, subHeaderLabel])
+        titlesStack.orientation = .vertical
+        titlesStack.alignment = .leading
+        titlesStack.spacing = 0
+
+        hypershiftToggle.setButtonType(.pushOnPushOff)
+        hypershiftToggle.bezelStyle = .recessed
+        hypershiftToggle.wantsLayer = true
+        hypershiftToggle.layer?.cornerRadius = 8
+        hypershiftToggle.target = self
+        hypershiftToggle.action = #selector(hypershiftToggleTapped(_:))
+        hypershiftToggle.font = .systemFont(ofSize: 13, weight: .bold)
+        hypershiftToggle.image = UIStyle.symbol("bolt.fill", size: 14)
+        hypershiftToggle.imagePosition = .imageLeading
+        hypershiftToggle.widthAnchor.constraint(equalToConstant: 120).isActive = true
+        hypershiftToggle.heightAnchor.constraint(equalToConstant: 32).isActive = true
+
+        topBar.addArrangedSubview(titlesStack)
         topBar.addArrangedSubview(NSView()) // spacer
         topBar.addArrangedSubview(profileLabel)
         topBar.addArrangedSubview(profilePopup)
         topBar.addArrangedSubview(managePopup)
+        topBar.addArrangedSubview(hypershiftToggle)
         topBar.addArrangedSubview(saveButton)
 
         // (Removed mouse visualization)
 
-        // Three equal-width columns of cards (1,4,7,10 | 2,5,8,11 | 3,6,9,12)
-        let col1 = NSStackView(); col1.orientation = .vertical; col1.spacing = 12
-        let col2 = NSStackView(); col2.orientation = .vertical; col2.spacing = 12
-        let col3 = NSStackView(); col3.orientation = .vertical; col3.spacing = 12
+        // Three equal-width columns of cards
+        let col1 = NSStackView(); col1.orientation = .vertical; col1.spacing = 16
+        let col2 = NSStackView(); col2.orientation = .vertical; col2.spacing = 16
+        let col3 = NSStackView(); col3.orientation = .vertical; col3.spacing = 16
 
         for idx in stride(from: 1, through: 10, by: 3) {
             let v = makeCard(for: idx); rowViews[idx] = v; col1.addArrangedSubview(v)
@@ -99,25 +131,25 @@ final class MappingViewController: NSViewController {
 
         let columns = NSStackView(views: [col1, col2, col3])
         columns.orientation = .horizontal
-        columns.spacing = 12
+        columns.spacing = 16
         columns.distribution = .fillEqually
         columns.translatesAutoresizingMaskIntoConstraints = false
 
         // Card container for columns
         let cardsCard = UIStyle.makeCard()
-        cardsCard.contentViewMargins = NSSize(width: 10, height: 10)
         cardsCard.addSubview(columns)
         NSLayoutConstraint.activate([
-            columns.leadingAnchor.constraint(equalTo: cardsCard.leadingAnchor, constant: 10),
-            columns.trailingAnchor.constraint(equalTo: cardsCard.trailingAnchor, constant: -10),
-            columns.topAnchor.constraint(equalTo: cardsCard.topAnchor, constant: 10),
-            columns.bottomAnchor.constraint(equalTo: cardsCard.bottomAnchor, constant: -10)
+            columns.leadingAnchor.constraint(equalTo: cardsCard.leadingAnchor, constant: 16),
+            columns.trailingAnchor.constraint(equalTo: cardsCard.trailingAnchor, constant: -16),
+            columns.topAnchor.constraint(equalTo: cardsCard.topAnchor, constant: 16),
+            columns.bottomAnchor.constraint(equalTo: cardsCard.bottomAnchor, constant: -16)
         ])
 
         let dpiStack = NSStackView()
-        dpiStack.orientation = .vertical
-        dpiStack.spacing = 12
         dpiStack.translatesAutoresizingMaskIntoConstraints = false
+        dpiStack.orientation = .horizontal
+        dpiStack.spacing = 16
+        dpiStack.distribution = .fillEqually
         for idx in [13, 14] {
             let card = makeCard(for: idx)
             rowViews[idx] = card
@@ -125,31 +157,40 @@ final class MappingViewController: NSViewController {
         }
 
         let extrasCard = UIStyle.makeCard()
-        extrasCard.contentViewMargins = NSSize(width: 10, height: 10)
         extrasCard.addSubview(dpiStack)
         NSLayoutConstraint.activate([
-            dpiStack.leadingAnchor.constraint(equalTo: extrasCard.leadingAnchor, constant: 10),
-            dpiStack.trailingAnchor.constraint(equalTo: extrasCard.trailingAnchor, constant: -10),
-            dpiStack.topAnchor.constraint(equalTo: extrasCard.topAnchor, constant: 10),
-            dpiStack.bottomAnchor.constraint(equalTo: extrasCard.bottomAnchor, constant: -10)
+            dpiStack.leadingAnchor.constraint(equalTo: extrasCard.leadingAnchor, constant: 16),
+            dpiStack.trailingAnchor.constraint(equalTo: extrasCard.trailingAnchor, constant: -16),
+            dpiStack.topAnchor.constraint(equalTo: extrasCard.topAnchor, constant: 16),
+            dpiStack.bottomAnchor.constraint(equalTo: extrasCard.bottomAnchor, constant: -16)
         ])
 
         let contentStack = NSStackView()
         contentStack.orientation = .vertical
-        contentStack.spacing = 12
+        contentStack.spacing = 16
         contentStack.translatesAutoresizingMaskIntoConstraints = false
         contentStack.addArrangedSubview(cardsCard)
         contentStack.addArrangedSubview(extrasCard)
 
-        // Main content area: mapping cards plus DPI buttons
-        let content = contentStack
+        let scrollView = NSScrollView()
+        scrollView.documentView = contentStack
+        scrollView.hasVerticalScroller = true
+        scrollView.drawsBackground = false
+        scrollView.borderType = .noBorder
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+
+        contentStack.translatesAutoresizingMaskIntoConstraints = false
+        contentStack.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor).isActive = true
+
+        // Main content area: scrollable mapping cards plus DPI buttons
+        let content = scrollView
 
         container = NSStackView()
         container.orientation = .vertical
-        container.spacing = 12
-        container.edgeInsets = NSEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
+        container.spacing = 20
+        container.edgeInsets = NSEdgeInsets(top: 24, left: 24, bottom: 24, right: 24)
         container.addArrangedSubview(topBar)
-        container.addArrangedSubview(NSBox()) // separator
+        container.addArrangedSubview(makeSeparator())
         container.addArrangedSubview(content)
 
         view.addSubview(container)
@@ -196,15 +237,15 @@ final class MappingViewController: NSViewController {
     private func highlight(card: NSView, on: Bool) {
         guard let layer = card.layer else { return }
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.2
+            ctx.duration = 0.25
             ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            layer.borderWidth = on ? 2.0 : 0.5
-            layer.borderColor = on ? UIStyle.razerGreen.withAlphaComponent(0.9).cgColor : NSColor.white.withAlphaComponent(0.18).cgColor
-            layer.shadowOpacity = on ? 0.25 : 0.0
-            layer.shadowRadius = on ? 12 : 0
-            layer.shadowColor = UIStyle.razerGreen.withAlphaComponent(0.6).cgColor
-            layer.shadowOffset = CGSize(width: 0, height: 0)
-            layer.transform = on ? CATransform3DMakeScale(1.02, 1.02, 1) : CATransform3DIdentity
+            layer.borderWidth = on ? 1.5 : 0.5
+            layer.borderColor = on ? UIStyle.razerGreen.withAlphaComponent(0.6).cgColor : NSColor.white.withAlphaComponent(0.12).cgColor
+            layer.backgroundColor = on ? NSColor.white.withAlphaComponent(0.08).cgColor : NSColor.white.withAlphaComponent(0.04).cgColor
+            layer.shadowOpacity = on ? 0.4 : 0.3
+            layer.shadowRadius = on ? 16 : 8
+            layer.shadowColor = on ? UIStyle.razerGreen.withAlphaComponent(0.4).cgColor : NSColor.black.cgColor
+            layer.transform = on ? CATransform3DMakeScale(1.03, 1.03, 1) : CATransform3DIdentity
         }
     }
 
@@ -255,57 +296,78 @@ final class MappingViewController: NSViewController {
         // Vertical content stack inside card
         let v = NSStackView()
         v.orientation = .vertical
-        v.spacing = 6
+        v.spacing = 8
+        v.alignment = .leading
         v.translatesAutoresizingMaskIntoConstraints = false
 
         // Title row with big button number and profile-colored accent
-        let title = NSTextField(labelWithString: displayName(for: index))
-        title.font = .systemFont(ofSize: 14, weight: .semibold)
-        title.textColor = .white
+        let title = NSTextField(labelWithString: displayName(for: index).uppercased())
+        title.font = .systemFont(ofSize: 10, weight: .black)
+        title.textColor = NSColor.white.withAlphaComponent(0.3)
 
         let desc = NSTextField(labelWithString: "")
-        desc.lineBreakMode = .byTruncatingTail
+        desc.lineBreakMode = .byWordWrapping
+        desc.usesSingleLineMode = false
+        desc.maximumNumberOfLines = 3
+        desc.font = .systemFont(ofSize: 14, weight: .bold)
         desc.textColor = .white
+        desc.alignment = .left
+        
+        // Ensure desc can wrap and take up space properly
+        desc.setContentHuggingPriority(.defaultLow, for: .vertical)
+        desc.setContentCompressionResistancePriority(.defaultHigh, for: .vertical)
 
         let buttonRow = NSStackView()
         buttonRow.orientation = .horizontal
         buttonRow.alignment = .centerY
         buttonRow.spacing = 8
 
-        let edit = NSButton(title: "Edit…", target: nil, action: nil)
-        edit.bezelStyle = .rounded
-        edit.image = UIStyle.symbol("pencil", size: 13, weight: .regular)
+        let edit = NSButton(title: "Configure", target: nil, action: nil)
+        edit.image = UIStyle.symbol("pencil", size: 12, weight: .bold)
         edit.imagePosition = .imageLeading
-        edit.toolTip = "Edit mapping for \(displayName(for: index))"
         edit.tag = index
         edit.target = self
         edit.action = #selector(editTapped(_:))
         UIStyle.stylePrimaryButton(edit)
+        
+        // Make edit button wider
+        edit.widthAnchor.constraint(equalToConstant: 100).isActive = true
+        edit.heightAnchor.constraint(equalToConstant: 32).isActive = true
 
-        let clear = NSButton(title: "Clear", target: nil, action: nil)
-        clear.bezelStyle = .rounded
-        clear.image = UIStyle.symbol("trash", size: 13, weight: .regular)
-        clear.imagePosition = .imageLeading
-        clear.contentTintColor = .systemRed
-        clear.toolTip = "Clear mapping for \(displayName(for: index))"
+        let clear = NSButton(title: "", target: nil, action: nil)
+        clear.image = UIStyle.symbol("trash", size: 12, weight: .medium)
+        clear.imagePosition = .imageOnly
+        clear.toolTip = "Reset mapping for \(displayName(for: index))"
+        clear.setAccessibilityLabel("Reset mapping for \(displayName(for: index))")
         clear.tag = index
         clear.target = self
         clear.action = #selector(clearTapped(_:))
         UIStyle.styleSecondaryButton(clear)
+        clear.contentTintColor = NSColor.white.withAlphaComponent(0.6)
+        
+        // Small circle clear button
+        clear.widthAnchor.constraint(equalToConstant: 32).isActive = true
+        clear.heightAnchor.constraint(equalToConstant: 32).isActive = true
 
         buttonRow.addArrangedSubview(edit)
         buttonRow.addArrangedSubview(clear)
 
+        let spacer = NSView()
+        spacer.setContentHuggingPriority(.defaultLow, for: .vertical)
+        spacer.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+
         v.addArrangedSubview(title)
         v.addArrangedSubview(desc)
+        v.addArrangedSubview(spacer) // flexible spacer
         v.addArrangedSubview(buttonRow)
 
         card.addSubview(v)
         NSLayoutConstraint.activate([
-            v.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 10),
-            v.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -10),
-            v.topAnchor.constraint(equalTo: card.topAnchor, constant: 10),
-            v.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -10)
+            v.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
+            v.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
+            v.topAnchor.constraint(equalTo: card.topAnchor, constant: 16),
+            v.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -16),
+            card.heightAnchor.constraint(equalToConstant: 160) // Enforce uniform height
         ])
 
         // Hover glow for card
@@ -331,11 +393,16 @@ final class MappingViewController: NSViewController {
     }
 
     private func refreshRows() {
-        let mapping = ConfigManager.shared.mappingForCurrentProfile()
+        let mapping = isHypershiftView ? ConfigManager.shared.hypershiftMappingForCurrentProfile() : ConfigManager.shared.mappingForCurrentProfile()
         for i in 1...14 {
             descLabels[i]?.stringValue = actionDescription(mapping[i])
         }
-        headerLabel.stringValue = "Button Mappings — \(ConfigManager.shared.currentProfileName)"
+        
+        // Update toggle appearance
+        hypershiftToggle.layer?.backgroundColor = isHypershiftView ? UIStyle.razerGreen.withAlphaComponent(0.2).cgColor : NSColor.white.withAlphaComponent(0.1).cgColor
+        hypershiftToggle.contentTintColor = isHypershiftView ? UIStyle.razerGreen : .white
+        
+        headerLabel.stringValue = ConfigManager.shared.currentProfileName
         reloadProfilesPopup()
     }
 
@@ -344,35 +411,47 @@ final class MappingViewController: NSViewController {
         switch action {
         case .keySequence(let keys, let d):
             let ks = keys.map { $0.formattedShortcut() }.joined(separator: ", ")
-            return d ?? "Key Sequence: \(ks)"
+            return d ?? ks
         case .application(let path, let d):
-            return d ?? "Open App: \(path)"
+            return d ?? "App: \(URL(fileURLWithPath: path).lastPathComponent)"
         case .systemCommand(let cmd, let d):
-            return d ?? "Command: \(cmd)"
+            return d ?? "Script: \(cmd)"
         case .textSnippet(let text, let d):
             let preview = text.replacingOccurrences(of: "\n", with: " ⏎ ")
             let truncated = preview.count > 40 ? String(preview.prefix(37)) + "…" : preview
-            return d ?? "Type Text: \(truncated)"
+            return d ?? "Text: \(truncated)"
         case .macro(_, let d):
             return d ?? "Macro"
         case .profileSwitch(let p, let d):
-            return d ?? "Switch Profile: \(p)"
+            return d ?? "Profile: \(p)"
+        case .hypershift:
+            return "Hypershift Modifier"
+        case .mediaKey(let key, let d):
+            return d ?? key.label
         }
+    }
+
+    @objc private func hypershiftToggleTapped(_ sender: NSButton) {
+        isHypershiftView = (sender.state == .on)
+        refreshRows()
     }
 
     @objc private func editTapped(_ sender: NSButton) {
         let idx = sender.tag
-        let editor = ActionEditorViewController(buttonIndex: idx) { [weak self] action in
-            if let action = action {
-                ConfigManager.shared.setAction(forButton: idx, action: action)
-            }
-            self?.refreshRows()
+        let editor = ActionEditorViewController(buttonIndex: idx, initialLayer: isHypershiftView ? 1 : 0) { [weak self] in
+            guard let self = self else { return }
+            self.refreshRows()
         }
         presentAsSheet(editor)
     }
 
     @objc private func clearTapped(_ sender: NSButton) {
-        ConfigManager.shared.setAction(forButton: sender.tag, action: nil)
+        let idx = sender.tag
+        if isHypershiftView {
+            ConfigManager.shared.setHypershiftAction(forButton: idx, action: nil)
+        } else {
+            ConfigManager.shared.setAction(forButton: idx, action: nil)
+        }
         refreshRows()
     }
 
@@ -504,6 +583,16 @@ final class MappingViewController: NSViewController {
         alert.addButton(withTitle: "Delete")
         alert.addButton(withTitle: "Cancel")
         return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    private func makeSeparator() -> NSView {
+        let box = NSBox()
+        box.boxType = .custom
+        box.borderWidth = 0.5
+        box.borderColor = NSColor.white.withAlphaComponent(0.1)
+        box.fillColor = NSColor.white.withAlphaComponent(0.5)
+        box.heightAnchor.constraint(equalToConstant: 1).isActive = true
+        return box
     }
 
     private func showInfo(_ message: String) {

@@ -17,6 +17,18 @@ struct Settings: Codable {
 
 struct Profile: Codable {
     var buttons: [String: ButtonAction]
+    var hardwareBindings: [String: HardwareBinding]?
+    var hypershiftMappings: [String: ButtonAction]?
+}
+
+struct HardwareBinding: Codable {
+    var usagePage: UInt32?
+    var usage: UInt32?
+    var keyCode: UInt16?
+    var cookie: UInt32?
+    var value: Int32?
+    var vendorID: Int?
+    var productID: Int?
 }
 
 struct ButtonAction: Codable {
@@ -28,6 +40,8 @@ struct ButtonAction: Codable {
     let text: String? // for textSnippet
     let steps: [MacroStep]? // for macro
     let profile: String? // for profileSwitch
+    let mediaKey: Int? // for mediaKey
+    let mode: String? // for hypershift
 }
 
 final class ConfigManager {
@@ -89,6 +103,7 @@ final class ConfigManager {
         } else {
             ButtonMapper.shared.updateMapping(mapping)
         }
+        ButtonMapper.shared.updateHypershiftMapping(hypershiftMappingForCurrentProfile())
     }
 
     func setCurrentProfile(_ name: String) {
@@ -96,6 +111,7 @@ final class ConfigManager {
         currentProfileName = name
         UserDefaults.standard.set(name, forKey: kCurrentProfileKey)
         ButtonMapper.shared.updateMapping(mappingForCurrentProfile())
+        ButtonMapper.shared.updateHypershiftMapping(hypershiftMappingForCurrentProfile())
     }
 
     func getRemappingEnabled() -> Bool {
@@ -121,6 +137,32 @@ final class ConfigManager {
         return result
     }
 
+    func hypershiftMappingForCurrentProfile() -> [Int: ActionType] {
+        guard let profile = profiles[currentProfileName] else { return [:] }
+        var result: [Int: ActionType] = [:]
+        if let mappings = profile.hypershiftMappings {
+            for (key, action) in mappings {
+                if let idx = Int(key), let mapped = convert(action: action) {
+                    result[idx] = mapped
+                }
+            }
+        }
+        return result
+    }
+
+    func hardwareBindingsForCurrentProfile() -> [Int: HardwareBinding] {
+        guard let profile = profiles[currentProfileName] else { return [:] }
+        var result: [Int: HardwareBinding] = [:]
+        if let bindings = profile.hardwareBindings {
+            for (key, binding) in bindings {
+                if let idx = Int(key) {
+                    result[idx] = binding
+                }
+            }
+        }
+        return result
+    }
+
     // MARK: - Profile Management
 
     @discardableResult
@@ -130,7 +172,7 @@ final class ConfigManager {
         if let base = base, let p = profiles[base] {
             profiles[trimmed] = p
         } else {
-            profiles[trimmed] = Profile(buttons: [:])
+            profiles[trimmed] = Profile(buttons: [:], hardwareBindings: nil, hypershiftMappings: nil)
         }
         setCurrentProfile(trimmed)
         return true
@@ -166,6 +208,7 @@ final class ConfigManager {
         } else {
             // refresh mapping for current profile
             ButtonMapper.shared.updateMapping(mappingForCurrentProfile())
+            ButtonMapper.shared.updateHypershiftMapping(hypershiftMappingForCurrentProfile())
         }
         return true
     }
@@ -184,6 +227,7 @@ final class ConfigManager {
             setCurrentProfile(cp)
         } else {
             ButtonMapper.shared.updateMapping(mappingForCurrentProfile())
+            ButtonMapper.shared.updateHypershiftMapping(hypershiftMappingForCurrentProfile())
         }
     }
 
@@ -222,6 +266,14 @@ final class ConfigManager {
         case "profileSwitch":
             if let p = action.profile { return .profileSwitch(profile: p, description: action.description) }
             return nil
+        case "hypershift":
+            let hsMode: HypershiftMode = (action.mode == "toggle") ? .toggle : .hold
+            return .hypershift(mode: hsMode)
+        case "mediaKey":
+            if let mkRaw = action.mediaKey, let mk = MediaKeyType(rawValue: mkRaw) {
+                return .mediaKey(key: mk, description: action.description)
+            }
+            return nil
         default:
             return nil
         }
@@ -230,23 +282,27 @@ final class ConfigManager {
     private func toButtonAction(_ action: ActionType) -> ButtonAction {
         switch action {
         case .keySequence(let keys, let description):
-            return ButtonAction(type: "keySequence", keys: keys, description: description, path: nil, command: nil, text: nil, steps: nil, profile: nil)
+            return ButtonAction(type: "keySequence", keys: keys, description: description, path: nil, command: nil, text: nil, steps: nil, profile: nil, mediaKey: nil, mode: nil)
         case .application(let path, let description):
-            return ButtonAction(type: "application", keys: nil, description: description, path: path, command: nil, text: nil, steps: nil, profile: nil)
+            return ButtonAction(type: "application", keys: nil, description: description, path: path, command: nil, text: nil, steps: nil, profile: nil, mediaKey: nil, mode: nil)
         case .systemCommand(let command, let description):
-            return ButtonAction(type: "systemCommand", keys: nil, description: description, path: nil, command: command, text: nil, steps: nil, profile: nil)
+            return ButtonAction(type: "systemCommand", keys: nil, description: description, path: nil, command: command, text: nil, steps: nil, profile: nil, mediaKey: nil, mode: nil)
         case .textSnippet(let text, let description):
-            return ButtonAction(type: "textSnippet", keys: nil, description: description, path: nil, command: nil, text: text, steps: nil, profile: nil)
+            return ButtonAction(type: "textSnippet", keys: nil, description: description, path: nil, command: nil, text: text, steps: nil, profile: nil, mediaKey: nil, mode: nil)
         case .macro(let steps, let description):
-            return ButtonAction(type: "macro", keys: nil, description: description, path: nil, command: nil, text: nil, steps: steps, profile: nil)
+            return ButtonAction(type: "macro", keys: nil, description: description, path: nil, command: nil, text: nil, steps: steps, profile: nil, mediaKey: nil, mode: nil)
         case .profileSwitch(let profile, let description):
-            return ButtonAction(type: "profileSwitch", keys: nil, description: description, path: nil, command: nil, text: nil, steps: nil, profile: profile)
+            return ButtonAction(type: "profileSwitch", keys: nil, description: description, path: nil, command: nil, text: nil, steps: nil, profile: profile, mediaKey: nil, mode: nil)
+        case .hypershift(let mode):
+            return ButtonAction(type: "hypershift", keys: nil, description: "Hypershift Modifier", path: nil, command: nil, text: nil, steps: nil, profile: nil, mediaKey: nil, mode: mode.rawValue)
+        case .mediaKey(let key, let description):
+            return ButtonAction(type: "mediaKey", keys: nil, description: description, path: nil, command: nil, text: nil, steps: nil, profile: nil, mediaKey: key.rawValue, mode: nil)
         }
     }
 
     // Update a single button's action in the current profile and refresh mapping
     func setAction(forButton index: Int, action: ActionType?) {
-        var profile = profiles[currentProfileName] ?? Profile(buttons: [:])
+        var profile = profiles[currentProfileName] ?? Profile(buttons: [:], hardwareBindings: nil, hypershiftMappings: nil)
         let key = String(index)
         if let action = action {
             profile.buttons[key] = toButtonAction(action)
@@ -255,7 +311,123 @@ final class ConfigManager {
         }
         profiles[currentProfileName] = profile
         ButtonMapper.shared.updateMapping(mappingForCurrentProfile())
+        saveUserProfiles()
     }
+
+    func setHypershiftAction(forButton index: Int, action: ActionType?) {
+        var profile = profiles[currentProfileName] ?? Profile(buttons: [:], hardwareBindings: nil, hypershiftMappings: nil)
+        let key = String(index)
+        if profile.hypershiftMappings == nil { profile.hypershiftMappings = [:] }
+        
+        if let action = action {
+            profile.hypershiftMappings?[key] = toButtonAction(action)
+        } else {
+            profile.hypershiftMappings?.removeValue(forKey: key)
+        }
+        profiles[currentProfileName] = profile
+        ButtonMapper.shared.updateHypershiftMapping(hypershiftMappingForCurrentProfile())
+        saveUserProfiles()
+    }
+
+    /// Atomic update for both Standard and Hypershift layers to prevent race conditions or partial saves.
+    func setBothActions(forButton index: Int, standard: ActionType?, hypershift: ActionType?) {
+        var profile = profiles[currentProfileName] ?? Profile(buttons: [:], hardwareBindings: nil, hypershiftMappings: nil)
+        let key = String(index)
+        
+        // Update Standard
+        if let std = standard {
+            profile.buttons[key] = toButtonAction(std)
+        } else {
+            profile.buttons.removeValue(forKey: key)
+        }
+        
+        // Update Hypershift
+        if profile.hypershiftMappings == nil { profile.hypershiftMappings = [:] }
+        if let hs = hypershift {
+            profile.hypershiftMappings?[key] = toButtonAction(hs)
+        } else {
+            profile.hypershiftMappings?.removeValue(forKey: key)
+        }
+        
+        // Persist once
+        profiles[currentProfileName] = profile
+        
+        // Sync both mappings to runtime
+        ButtonMapper.shared.updateMapping(mappingForCurrentProfile())
+        ButtonMapper.shared.updateHypershiftMapping(hypershiftMappingForCurrentProfile())
+        
+        saveUserProfiles()
+        NSLog("[Config] Atomically updated standard and hypershift actions for button \(index)")
+    }
+
+    func setHardwareBinding(forButton index: Int, binding: HardwareBinding?) {
+        var profile = profiles[currentProfileName] ?? Profile(buttons: [:], hardwareBindings: nil, hypershiftMappings: nil)
+        let key = String(index)
+        if profile.hardwareBindings == nil { profile.hardwareBindings = [:] }
+        
+        if let binding = binding {
+            profile.hardwareBindings?[key] = binding
+        } else {
+            profile.hardwareBindings?.removeValue(forKey: key)
+        }
+        profiles[currentProfileName] = profile
+        NotificationCenter.default.post(name: ConfigManager.didUpdateHardwareBindingsNotification, object: nil)
+        saveUserProfiles() // Ensure it's saved to disk
+    }
+
+    func getHardwareBinding(forUsage usage: UInt32, usagePage: UInt32, cookie: UInt32? = nil, value: Int32? = nil, vendorID: Int? = nil, productID: Int? = nil) -> HardwareBinding? {
+        guard let bindings = profiles[currentProfileName]?.hardwareBindings else { return nil }
+        
+        // Collect all candidates that match usage, page, cookie, and vendorID/productID (if stored)
+        let candidates = bindings.values.filter { b in
+            guard b.usage == usage && b.usagePage == usagePage else { return false }
+            if b.cookie != nil && cookie != nil && b.cookie != cookie { return false }
+            
+            // Device-bound mapping check
+            if let bindingVendor = b.vendorID, let currentVendor = vendorID, bindingVendor != currentVendor { return false }
+            if let bindingProduct = b.productID, let currentProduct = productID, bindingProduct != currentProduct { return false }
+            
+            return true
+        }
+        
+        if candidates.isEmpty { return nil }
+
+        // 1. Prioritize exact value match
+        if let val = value {
+            if let exact = candidates.first(where: { $0.value == val }) {
+                return exact
+            }
+        }
+        
+        // 2. Fallback to generic binding (no value specified in binding)
+        if let generic = candidates.first(where: { $0.value == nil }) {
+            return generic
+        }
+        
+        // 3. Last resort: if only one candidate exists, return it even if value doesn't match perfectly
+        if candidates.count == 1 {
+            return candidates[0]
+        }
+        
+        return nil
+    }
+
+    func getButtonIndex(forHardwareBinding binding: HardwareBinding) -> Int? {
+        guard let bindings = profiles[currentProfileName]?.hardwareBindings else { return nil }
+        for (key, b) in bindings {
+            if b.usage == binding.usage &&
+               b.usagePage == binding.usagePage &&
+               b.cookie == binding.cookie &&
+               b.value == binding.value &&
+               b.vendorID == binding.vendorID &&
+               b.productID == binding.productID {
+                return Int(key)
+            }
+        }
+        return nil
+    }
+
+    static let didUpdateHardwareBindingsNotification = Notification.Name("ConfigManager.didUpdateHardwareBindings")
 
     // Persist current profiles to Application Support
     func saveUserProfiles() {
