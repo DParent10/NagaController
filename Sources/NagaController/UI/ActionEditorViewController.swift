@@ -101,6 +101,17 @@ final class ActionEditorViewController: NSViewController {
         ShortcutPreset(name: "Delete (Backspace)", key: "delete", modifiers: [], isHeader: false),
         ShortcutPreset(name: "Space", key: "space", modifiers: [], isHeader: false),
 
+        .header("Navigation"),
+        ShortcutPreset(name: "Left Arrow", key: "left", modifiers: [], isHeader: false),
+        ShortcutPreset(name: "Right Arrow", key: "right", modifiers: [], isHeader: false),
+        ShortcutPreset(name: "Up Arrow", key: "up", modifiers: [], isHeader: false),
+        ShortcutPreset(name: "Down Arrow", key: "down", modifiers: [], isHeader: false),
+        ShortcutPreset(name: "Home", key: "home", modifiers: [], isHeader: false),
+        ShortcutPreset(name: "End", key: "end", modifiers: [], isHeader: false),
+        ShortcutPreset(name: "Page Up", key: "page up", modifiers: [], isHeader: false),
+        ShortcutPreset(name: "Page Down", key: "page down", modifiers: [], isHeader: false),
+        ShortcutPreset(name: "Forward Delete", key: "forward delete", modifiers: [], isHeader: false),
+
         .header("Modifier Keys"),
         ShortcutPreset(name: "Command", key: "command", modifiers: [], isHeader: false),
         ShortcutPreset(name: "Shift", key: "shift", modifiers: [], isHeader: false),
