@@ -109,8 +109,9 @@ final class ButtonMapper {
                     return
                 }
 
-                let flags = modifierFlags(from: stroke.modifiers)
-                if let code = keyCode, let eventDown = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: true) {
+                let resolved = resolve(stroke)
+                let flags = modifierFlags(from: stroke.modifiers).union(resolved?.extraFlags ?? [])
+                if let code = resolved?.code, let eventDown = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: true) {
                     eventDown.flags = flags
                     post(eventDown)
                     activeHolds[buttonIndex] = (code, flags)
@@ -243,9 +244,9 @@ final class ButtonMapper {
 
     private func sendKeyStroke(_ stroke: KeyStroke) {
         // Map simple keys (letters) to key codes; limited for Phase 1
-        guard let keyCode = effectiveKeyCode(for: stroke) else { return }
-
-        let flags = modifierFlags(from: stroke.modifiers)
+        guard let resolved = resolve(stroke) else { return }
+        let keyCode = resolved.code
+        let flags = modifierFlags(from: stroke.modifiers).union(resolved.extraFlags)
 
         // Key down
         if let eventDown = CGEvent(keyboardEventSource: nil, virtualKey: keyCode, keyDown: true) {
@@ -259,11 +260,22 @@ final class ButtonMapper {
         }
     }
 
-    private func effectiveKeyCode(for stroke: KeyStroke) -> CGKeyCode? {
-        if let code = stroke.keyCode {
-            return CGKeyCode(code)
+    /// Key code for a stroke plus any flags the current layout needs to produce it.
+    /// Single printable characters are resolved against the active keyboard layout so a
+    /// mapping recorded as "x" types x on Dvorak too (issue #10); everything else uses the
+    /// recorded key code or the static table.
+    private func resolve(_ stroke: KeyStroke) -> (code: CGKeyCode, extraFlags: CGEventFlags)? {
+        if stroke.key.count == 1, let key = KeyboardLayout.shared.key(for: stroke.key) {
+            return (key.code, key.needsShift ? .maskShift : [])
         }
-        return KeyStroke.keyCode(for: stroke.key).map { CGKeyCode($0) }
+        if let code = stroke.keyCode {
+            return (CGKeyCode(code), [])
+        }
+        return KeyStroke.keyCode(for: stroke.key).map { (CGKeyCode($0), []) }
+    }
+
+    private func effectiveKeyCode(for stroke: KeyStroke) -> CGKeyCode? {
+        resolve(stroke)?.code
     }
 
     private func modifierFlags(from modifiers: [String]) -> CGEventFlags {
