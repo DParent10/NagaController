@@ -46,6 +46,7 @@ struct ButtonAction: Codable {
 
 final class ConfigManager {
     static let shared = ConfigManager()
+    static let profileDidChangeNotification = Notification.Name("NagaController.profileDidChange")
 
     private(set) var profiles: [String: Profile] = [:]
     private(set) var currentProfileName: String = "Default"
@@ -112,6 +113,7 @@ final class ConfigManager {
         UserDefaults.standard.set(name, forKey: kCurrentProfileKey)
         ButtonMapper.shared.updateMapping(mappingForCurrentProfile())
         ButtonMapper.shared.updateHypershiftMapping(hypershiftMappingForCurrentProfile())
+        NotificationCenter.default.post(name: ConfigManager.profileDidChangeNotification, object: self)
     }
 
     func getRemappingEnabled() -> Bool {
