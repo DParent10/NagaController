@@ -162,7 +162,9 @@ final class HIDListener {
                     }
                 }
             } else if pressed {
-                 NSLog("[HID] No lookup for pg=0x\(String(usagePage, radix: 16)) us=0x\(String(usage, radix: 16)) val=\(activeVal) co=\(cookie)")
+                #if DEBUG
+                NSLog("[HID] No lookup for pg=0x\(String(usagePage, radix: 16)) us=0x\(String(usage, radix: 16)) val=\(activeVal) co=\(cookie)")
+                #endif
             }
             return
         }
@@ -315,6 +317,13 @@ final class HIDListener {
             return index
         }
         
+        // Virtual DPI triggers synthesized from Razer report ID 5 (see handle(report:)).
+        // Without this default, DPI buttons only work after "Learn Hardware Trigger".
+        if usagePage == 0xFF01 {
+            if usage == 0x01 { return 13 }
+            if usage == 0x02 { return 14 }
+        }
+
         // Manual fallback for DPI buttons if not yet mapped in config
         if usagePage == 0x0C && usage == 0x238 {
             if value == 1 { return 13 }
