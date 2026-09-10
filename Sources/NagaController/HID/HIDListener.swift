@@ -19,6 +19,12 @@ final class HIDListener {
     
     private var learningCallback: ((UInt32, UInt32, IOHIDElementCookie, Int32, Int, Int) -> Void)?
 
+    // Usage pages that carry periodic status values (axes, battery, sensors) rather than
+    // button presses. Never learn them as triggers or match bindings against them; a
+    // Naga V2 HS was seen emitting Sensor-page (0x20) values that got learned as a
+    // trigger and then fired the button on every status update.
+    private static let statusUsagePages: Set<UInt32> = [0x01, 0x06, 0x20, 0x84, 0x85]
+
     private static let whitelistedVendors: Set<Int> = [
         0x1532,
         0x068e
@@ -104,6 +110,7 @@ final class HIDListener {
         // bail out before doing any per-event device property lookups.
         let isMovement = (usagePage == 0x01 && (usage == 0x30 || usage == 0x31 || usage == 0x38))
         if isMovement { return }
+        if HIDListener.statusUsagePages.contains(usagePage) { return }
 
         let device = IOHIDElementGetDevice(element)
         let isLearning = queue.sync { learningCallback != nil }
