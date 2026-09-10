@@ -93,6 +93,14 @@ final class ActionEditorViewController: NSViewController {
         ShortcutPreset(name: "Redo", key: "z", modifiers: ["cmd", "shift"], isHeader: false),
         ShortcutPreset(name: "Select All", key: "a", modifiers: ["cmd"], isHeader: false),
         
+        .header("Special Keys"),
+        ShortcutPreset(name: "Return", key: "return", modifiers: [], isHeader: false),
+        ShortcutPreset(name: "Enter (keypad)", key: "enter", modifiers: [], isHeader: false),
+        ShortcutPreset(name: "Tab", key: "tab", modifiers: [], isHeader: false),
+        ShortcutPreset(name: "Escape", key: "escape", modifiers: [], isHeader: false),
+        ShortcutPreset(name: "Delete (Backspace)", key: "delete", modifiers: [], isHeader: false),
+        ShortcutPreset(name: "Space", key: "space", modifiers: [], isHeader: false),
+
         .header("Modifier Keys"),
         ShortcutPreset(name: "Command", key: "command", modifiers: [], isHeader: false),
         ShortcutPreset(name: "Shift", key: "shift", modifiers: [], isHeader: false),
@@ -126,6 +134,12 @@ final class ActionEditorViewController: NSViewController {
 
     private var recordedKeyCode: UInt16?
     private var recordedKeyIdentifier: String?
+
+    // Save/Cancel use Return and Escape as key equivalents. macOS routes those to the
+    // buttons before the capture box sees them, so a user trying to record Enter just
+    // saved and closed the editor. Suspend the equivalents while the box has focus.
+    private var saveButton: NSButton!
+    private var cancelButton: NSButton!
 
     init(buttonIndex: Int, initialLayer: Int = 0, onComplete: @escaping () -> Void) {
         self.buttonIndex = buttonIndex
@@ -206,10 +220,12 @@ final class ActionEditorViewController: NSViewController {
         keyField.onKeyCaptured = { [weak self] event in
             self?.capture(event: event)
         }
-        keyField.onFocusChanged = { [weak keyFieldContainer] focused in
+        keyField.onFocusChanged = { [weak self, weak keyFieldContainer] focused in
             keyFieldContainer?.layer?.borderColor = (focused ? UIStyle.razerGreen.withAlphaComponent(0.6).cgColor : NSColor.white.withAlphaComponent(0.12).cgColor)
             keyFieldContainer?.layer?.borderWidth = focused ? 2 : 1
             keyFieldContainer?.layer?.backgroundColor = focused ? NSColor.white.withAlphaComponent(0.1).cgColor : NSColor.white.withAlphaComponent(0.05).cgColor
+            self?.saveButton?.keyEquivalent = focused ? "" : "\r"
+            self?.cancelButton?.keyEquivalent = focused ? "" : "\u{1b}"
         }
 
         [modCmd, modAlt, modCtrl, modShift].forEach { button in
@@ -344,7 +360,7 @@ final class ActionEditorViewController: NSViewController {
         buttonsStack.orientation = .horizontal
         buttonsStack.spacing = 12
         
-        let cancelButton = NSButton(title: "Cancel", target: self, action: #selector(cancelTapped))
+        cancelButton = NSButton(title: "Cancel", target: self, action: #selector(cancelTapped))
         cancelButton.image = UIStyle.symbol("xmark", size: 14)
         cancelButton.imagePosition = .imageLeading
         cancelButton.keyEquivalent = "\u{1b}"
@@ -352,7 +368,7 @@ final class ActionEditorViewController: NSViewController {
         cancelButton.widthAnchor.constraint(equalToConstant: 100).isActive = true
         cancelButton.heightAnchor.constraint(equalToConstant: 36).isActive = true
 
-        let saveButton = NSButton(title: "Save", target: self, action: #selector(saveTapped))
+        saveButton = NSButton(title: "Save", target: self, action: #selector(saveTapped))
         saveButton.image = UIStyle.symbol("checkmark.circle.fill", size: 14, weight: .bold)
         saveButton.imagePosition = .imageLeading
         saveButton.keyEquivalent = "\r"
@@ -741,7 +757,7 @@ final class ActionEditorViewController: NSViewController {
         let title = presetsPopup.titleOfSelectedItem
         presetsPopup.selectItem(at: 0) // Reset to "Presets..."
         
-        guard let title = title, title != "Presets…" else { return }
+        guard let title = title, title != "Quick Presets…" else { return }
         guard let preset = presets.first(where: { $0.name == title && !$0.isHeader }) else { return }
         
         recordedKeyIdentifier = preset.key
