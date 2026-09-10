@@ -33,7 +33,7 @@ A macOS menu bar app to remap the 12 side buttons of the Razer Naga V2 Hyperspee
 
 ### First run setup
 
-See the [user guide](USER-GUIDE.md) for shortcuts, profile switching, permissions, and a tested DPI button setup.
+See the [user guide](USER-GUIDE.md) for shortcuts, profile switching, Hypershift, permissions, and a tested DPI button setup.
 
 1. Click the menu bar icon → turn ON "Enable remapping"
 2. Click "Configure mappings…" to set actions for buttons 1–12
@@ -60,9 +60,9 @@ See the [user guide](USER-GUIDE.md) for shortcuts, profile switching, permission
 ## Troubleshooting
 
 1. Grant Accessibility permissions (System Settings → Privacy & Security → Accessibility) and ensure the app is checked
-2. Launch from Terminal to see diagnostics:
+2. Launch from Terminal to see diagnostics (launch through `open`; running the binary directly makes macOS kill the app on its first Bluetooth access):
    ```bash
-   ./NagaController.app/Contents/MacOS/NagaController
+   open --stdout /tmp/naga.log --stderr /tmp/naga.log ./NagaController.app && tail -f /tmp/naga.log
    ```
 3. Turn ON "Enable remapping" in the menu bar popover
 4. Expected logs:
@@ -110,7 +110,7 @@ This does not work over the HyperSpeed 2.4GHz dongle — most vendor dongles do 
 bash Scripts/build_app.sh
 
 # Run the app
-./NagaController.app/Contents/MacOS/NagaController
+open ./NagaController.app
 ```
 
 ### Create DMG for distribution
