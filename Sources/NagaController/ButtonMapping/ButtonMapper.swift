@@ -34,6 +34,28 @@ final class ButtonMapper {
     /// swallowed by our own tap as an auto-repeat of the button that triggered it.
     static let syntheticEventTag: Int64 = 0x4E41_4741 // "NAGA"
 
+    // A private source keeps emitted shortcut modifiers out of the combined source.
+    private let keyboardSource = CGEventSource(stateID: .privateState)
+
+    static func modifierReleaseEvents(_ flags: CGEventFlags, physicalFlags: CGEventFlags) -> [CGEvent] {
+        let keys: [(CGEventFlags, CGKeyCode)] = [(.maskCommand, 55), (.maskShift, 56),
+                                                (.maskAlternate, 58), (.maskControl, 59)]
+        return keys.compactMap { flag, code in
+            guard flags.contains(flag), !physicalFlags.contains(flag),
+                  let event = CGEvent(keyboardEventSource: CGEventSource(stateID: .privateState),
+                                      virtualKey: code, keyDown: false) else { return nil }
+            event.type = .flagsChanged
+            event.flags = physicalFlags
+            return event
+        }
+    }
+
+    private func finishShortcut(_ flags: CGEventFlags) {
+        for event in Self.modifierReleaseEvents(flags, physicalFlags: CGEventSource.flagsState(.hidSystemState)) {
+            post(event)
+        }
+    }
+
     private func post(_ event: CGEvent) {
         event.setIntegerValueField(.eventSourceUserData, value: ButtonMapper.syntheticEventTag)
         event.post(tap: .cghidEventTap)
@@ -110,7 +132,7 @@ final class ButtonMapper {
                 }
 
                 let flags = modifierFlags(from: stroke.modifiers)
-                if let code = keyCode, let eventDown = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: true) {
+                if let code = keyCode, let eventDown = CGEvent(keyboardEventSource: keyboardSource, virtualKey: code, keyDown: true) {
                     eventDown.flags = flags
                     post(eventDown)
                     activeHolds[buttonIndex] = (code, flags)
@@ -161,9 +183,10 @@ final class ButtonMapper {
         }
         
         if let (keyCode, flags) = activeHolds.removeValue(forKey: buttonIndex) {
-            if let eventUp = CGEvent(keyboardEventSource: nil, virtualKey: keyCode, keyDown: false) {
-                eventUp.flags = flags
+            if let eventUp = CGEvent(keyboardEventSource: keyboardSource, virtualKey: keyCode, keyDown: false) {
+                eventUp.flags = CGEventSource.flagsState(.hidSystemState)
                 post(eventUp)
+                finishShortcut(flags)
                 NSLog("[Mapping] Hold end for button \(buttonIndex)")
             }
         }
@@ -248,14 +271,15 @@ final class ButtonMapper {
         let flags = modifierFlags(from: stroke.modifiers)
 
         // Key down
-        if let eventDown = CGEvent(keyboardEventSource: nil, virtualKey: keyCode, keyDown: true) {
+        if let eventDown = CGEvent(keyboardEventSource: keyboardSource, virtualKey: keyCode, keyDown: true) {
             eventDown.flags = flags
             post(eventDown)
         }
         // Key up
-        if let eventUp = CGEvent(keyboardEventSource: nil, virtualKey: keyCode, keyDown: false) {
-            eventUp.flags = flags
+        if let eventUp = CGEvent(keyboardEventSource: keyboardSource, virtualKey: keyCode, keyDown: false) {
+            eventUp.flags = CGEventSource.flagsState(.hidSystemState)
             post(eventUp)
+            finishShortcut(flags)
         }
     }
 
@@ -272,7 +296,7 @@ final class ButtonMapper {
             switch m {
             case "cmd", "command": flags.insert(.maskCommand)
             case "shift": flags.insert(.maskShift)
-            case "alt", "option": flags.insert(.maskAlternate)
+            case "alt", "option", "opt": flags.insert(.maskAlternate)
             case "ctrl", "control": flags.insert(.maskControl)
             case "fn": flags.insert(.maskSecondaryFn)
             default: break

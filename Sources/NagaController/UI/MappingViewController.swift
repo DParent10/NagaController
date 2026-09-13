@@ -166,12 +166,49 @@ final class MappingViewController: NSViewController {
             dpiStack.bottomAnchor.constraint(equalTo: extrasCard.bottomAnchor, constant: -16)
         ])
 
+        // Wheel controls ship unbound: each user pairs them to their own mouse
+        // with Learn Hardware Trigger, since tilt and click differ per device.
+        let wheelStack = NSStackView()
+        wheelStack.translatesAutoresizingMaskIntoConstraints = false
+        wheelStack.orientation = .horizontal
+        wheelStack.spacing = 16
+        wheelStack.distribution = .fillEqually
+        for idx in [15, 16, 17] {
+            let card = makeCard(for: idx)
+            rowViews[idx] = card
+            wheelStack.addArrangedSubview(card)
+        }
+
+        let wheelHint = NSTextField(labelWithString: "Wheel controls need pairing. Open Configure, choose Learn Hardware Trigger, then tilt or click the wheel.")
+        wheelHint.font = .systemFont(ofSize: 11)
+        wheelHint.textColor = NSColor.white.withAlphaComponent(0.5)
+        wheelHint.lineBreakMode = .byWordWrapping
+        wheelHint.usesSingleLineMode = false
+        wheelHint.translatesAutoresizingMaskIntoConstraints = false
+
+        let wheelColumn = NSStackView(views: [wheelHint, wheelStack])
+        wheelColumn.orientation = .vertical
+        wheelColumn.spacing = 12
+        wheelColumn.translatesAutoresizingMaskIntoConstraints = false
+
+        let wheelCard = UIStyle.makeCard()
+        wheelCard.addSubview(wheelColumn)
+        NSLayoutConstraint.activate([
+            wheelColumn.leadingAnchor.constraint(equalTo: wheelCard.leadingAnchor, constant: 16),
+            wheelColumn.trailingAnchor.constraint(equalTo: wheelCard.trailingAnchor, constant: -16),
+            wheelColumn.topAnchor.constraint(equalTo: wheelCard.topAnchor, constant: 16),
+            wheelColumn.bottomAnchor.constraint(equalTo: wheelCard.bottomAnchor, constant: -16),
+            wheelStack.leadingAnchor.constraint(equalTo: wheelColumn.leadingAnchor),
+            wheelStack.trailingAnchor.constraint(equalTo: wheelColumn.trailingAnchor)
+        ])
+
         let contentStack = NSStackView()
         contentStack.orientation = .vertical
         contentStack.spacing = 16
         contentStack.translatesAutoresizingMaskIntoConstraints = false
         contentStack.addArrangedSubview(cardsCard)
         contentStack.addArrangedSubview(extrasCard)
+        contentStack.addArrangedSubview(wheelCard)
 
         let scrollView = NSScrollView()
         scrollView.documentView = contentStack
@@ -397,6 +434,9 @@ final class MappingViewController: NSViewController {
         switch index {
         case 13: return "DPI Up"
         case 14: return "DPI Down"
+        case 15: return "Wheel Tilt Left"
+        case 16: return "Wheel Tilt Right"
+        case 17: return "Wheel Click"
         default: return "Button \(index)"
         }
     }
@@ -409,7 +449,7 @@ final class MappingViewController: NSViewController {
 
     private func refreshRows() {
         let mapping = isHypershiftView ? ConfigManager.shared.hypershiftMappingForCurrentProfile() : ConfigManager.shared.mappingForCurrentProfile()
-        for i in 1...14 {
+        for i in 1...17 {
             descLabels[i]?.stringValue = actionDescription(mapping[i])
         }
         

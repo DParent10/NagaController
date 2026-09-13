@@ -16,6 +16,16 @@ final class HIDListener {
     // Increased to account for scheduling/processing latency between HID and event tap
     private let recentWindow: TimeInterval = 1.00
     private var syntheticStates: [Int: Bool] = [:]
+    private var pointerRouter = PointerInputRouter()
+    private static let timebase: mach_timebase_info_data_t = {
+        var info = mach_timebase_info_data_t()
+        mach_timebase_info(&info)
+        return info
+    }()
+
+    func consumePointer(kind: PointerInputRouter.Kind, timestamp: UInt64) -> Int? {
+        pointerRouter.consume(kind: kind, timestamp: timestamp)
+    }
     
     private var learningCallback: ((UInt32, UInt32, IOHIDElementCookie, Int32, Int, Int) -> Void)?
 
@@ -147,6 +157,21 @@ final class HIDListener {
                 }
             }
             if isLearning { return }
+
+            // Mouse clicks and pan require the pointer event tap, not the number-key
+            // path. Record releases too; they must never leak through to Chrome.
+            if let index = PointerInputRouter.bindingIndex(
+                bindings: ConfigManager.shared.hardwareBindingsForCurrentProfile(),
+                usagePage: usagePage, usage: usage, cookie: UInt32(cookie), value: activeVal,
+                vendorID: vendor, productID: productID) {
+                let ticks = IOHIDValueGetTimeStamp(value)
+                let nanos = UInt64(Double(ticks) * Double(Self.timebase.numer) / Double(Self.timebase.denom))
+                let kind: PointerInputRouter.Kind = usagePage == 9
+                    ? .button(usage: usage, down: pressedValue != 0) : .horizontalScroll
+                pointerRouter.record(.init(kind: kind, timestamp: nanos, buttonIndex: index))
+                NSLog("[Pointer] HID observed slot=%d page=%u usage=%u value=%d", index, usagePage, usage, activeVal)
+                return
+            }
 
             // Support dynamic mappings for non-keyboard pages
             let buttonIndex = HIDListener.buttonIndex(forUsage: usage, usagePage: usagePage, cookie: UInt32(cookie), value: activeVal, vendorID: vendor, productID: productID)

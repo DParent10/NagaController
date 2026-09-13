@@ -27,7 +27,8 @@ let package = Package(
         .testTarget(
             name: "NagaControllerTests",
             dependencies: ["NagaController"],
-            path: "Tests/NagaControllerTests"
+            path: "Tests/NagaControllerTests",
+            exclude: ["Fixtures"]
         )
     ]
 )
