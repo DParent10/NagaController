@@ -233,10 +233,10 @@ final class EventTapManager {
                     guard self.activePointerButtons[usage] == nil else { return }
                     self.activePointerButtons[usage] = index
                     ButtonMapper.shared.handlePress(buttonIndex: index)
-                    NSLog("[Pointer] Suppressed native button down; performed slot=%d", index)
+                    Log.debug("[Pointer] Suppressed native button down; performed slot=\(index)")
                 } else if !down, let index = self.activePointerButtons.removeValue(forKey: usage) {
                     ButtonMapper.shared.handleRelease(buttonIndex: index)
-                    NSLog("[Pointer] Suppressed native button up; released slot=%d", index)
+                    Log.debug("[Pointer] Suppressed native button up; released slot=\(index)")
                 } else { replay() }
             case .horizontalScroll:
                 guard let index = matched else { replay(); return }
@@ -251,7 +251,7 @@ final class EventTapManager {
                 self.lastPanTimestamp[index] = now
                 ButtonMapper.shared.handlePress(buttonIndex: index)
                 ButtonMapper.shared.handleRelease(buttonIndex: index)
-                NSLog("[Pointer] Suppressed native pan; performed slot=%d", index)
+                Log.debug("[Pointer] Suppressed native pan; performed slot=\(index)")
             }
         }
         return true

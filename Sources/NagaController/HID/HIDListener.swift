@@ -54,7 +54,7 @@ final class HIDListener {
             guard context != nil else { return }
             let vendor = HIDListener.vendorID(device: device) ?? -1
             let product = (IOHIDDeviceGetProperty(device, kIOHIDProductKey as CFString) as? String) ?? "<unknown>"
-            NSLog("[HID] Device plugged/matched: vendor=0x\(String(vendor, radix: 16)), product=\(product)")
+            Log.debug("[HID] Device plugged/matched: vendor=0x\(String(vendor, radix: 16)), product=\(product)")
         }, UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()))
 
         IOHIDManagerRegisterInputValueCallback(manager, { context, result, sender, value in
@@ -74,8 +74,8 @@ final class HIDListener {
         if openResult != kIOReturnSuccess {
             NSLog("[HID] IOHIDManagerOpen failed: \(openResult)")
         } else {
-            NSLog("[HID] Listener started. VERSION: \(HIDListener.DIAGNOSTIC_VERSION)")
-            NSLog("[HID] Matching ALL devices for diagnostics + RAW reports enabled.")
+            Log.debug("[HID] Listener started. VERSION: \(HIDListener.DIAGNOSTIC_VERSION)")
+            Log.debug("[HID] Matching ALL devices for diagnostics + RAW reports enabled.")
             if let set = IOHIDManagerCopyDevices(manager) {
                 let devices = (set as NSSet) as! Set<IOHIDDevice>
                 for dev in devices {
@@ -85,7 +85,7 @@ final class HIDListener {
                     let usage = (IOHIDDeviceGetProperty(dev, kIOHIDPrimaryUsageKey as CFString) as? Int) ?? -1
                     let usagePage = (IOHIDDeviceGetProperty(dev, kIOHIDPrimaryUsagePageKey as CFString) as? Int) ?? -1
                     let ptr = Unmanaged.passUnretained(dev).toOpaque()
-                    NSLog("[HID] DISCOVERY: [\(ptr)] product=\(product), vendor=0x\(String(vendor, radix: 16)), usage=0x\(String(usagePage, radix: 16)):0x\(String(usage, radix: 16))")
+                    Log.debug("[HID] DISCOVERY: [\(ptr)] product=\(product), vendor=0x\(String(vendor, radix: 16)), usage=0x\(String(usagePage, radix: 16)):0x\(String(usage, radix: 16))")
                 }
             }
         }
@@ -169,7 +169,7 @@ final class HIDListener {
                 let kind: PointerInputRouter.Kind = usagePage == 9
                     ? .button(usage: usage, down: pressedValue != 0) : .horizontalScroll
                 pointerRouter.record(.init(kind: kind, timestamp: nanos, buttonIndex: index))
-                NSLog("[Pointer] HID observed slot=%d page=%u usage=%u value=%d", index, usagePage, usage, activeVal)
+                Log.debug("[Pointer] HID observed slot=\(index) page=\(usagePage) usage=\(usage) value=\(activeVal)")
                 return
             }
 
@@ -235,7 +235,7 @@ final class HIDListener {
         queue.sync { syntheticStates[buttonIndex] = pressed }
 
         if pressed {
-            NSLog("[HID] Synthetic press captured for button \(buttonIndex) (raw=0x\(String(rawValue, radix: 16)))")
+            Log.debug("[HID] Synthetic press captured for button \(buttonIndex) (raw=0x\(String(rawValue, radix: 16)))")
             if ConfigManager.shared.getRemappingEnabled() {
                 ButtonMapper.shared.handlePress(buttonIndex: buttonIndex)
             }
@@ -300,7 +300,7 @@ final class HIDListener {
                 #if DEBUG
                 let bytes = UnsafeBufferPointer(start: report, count: length)
                 let hex = bytes.map { String(format: "%02x", $0) }.joined(separator: " ")
-                NSLog("[HID] RAW REPORT: [ID=\(id)] Len=\(length), Data=\(hex)")
+                Log.debug("[HID] RAW REPORT: [ID=\(id)] Len=\(length), Data=\(hex)")
                 #endif
             }
         }

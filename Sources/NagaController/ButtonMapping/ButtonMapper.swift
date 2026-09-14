@@ -102,11 +102,11 @@ final class ButtonMapper {
                 NSLog("[Mapping] Button \(buttonIndex) matched Hypershift mapping: \(hAction)")
             } else {
                 actionToPerform = mapping[buttonIndex]
-                NSLog("[Mapping] Button \(buttonIndex) fallback to Standard mapping (Hypershift active but no specific mapping): \(String(describing: actionToPerform))")
+                Log.debug("[Mapping] Button \(buttonIndex) fallback to Standard mapping (Hypershift active but no specific mapping): \(String(describing: actionToPerform))")
             }
         } else {
             actionToPerform = mapping[buttonIndex]
-            NSLog("[Mapping] Button \(buttonIndex) Standard mapping: \(String(describing: actionToPerform))")
+            Log.debug("[Mapping] Button \(buttonIndex) Standard mapping: \(String(describing: actionToPerform))")
         }
 
         guard let action = actionToPerform else {
@@ -126,7 +126,7 @@ final class ButtonMapper {
                         event.type = .flagsChanged
                         event.flags = currentModifierFlags
                         post(event)
-                        NSLog("[Mapping] Modifier hold start: button \(buttonIndex) -> \(stroke.displayLabel), cumulative flags: \(event.flags)")
+                        Log.debug("[Mapping] Modifier hold start: button \(buttonIndex) -> \(stroke.displayLabel), cumulative flags: \(event.flags)")
                     }
                     return
                 }
@@ -136,7 +136,7 @@ final class ButtonMapper {
                     eventDown.flags = flags
                     post(eventDown)
                     activeHolds[buttonIndex] = (code, flags)
-                    NSLog("[Mapping] Hold start for button \(buttonIndex) -> key=\(stroke.displayLabel), flags=\(flags)")
+                    Log.debug("[Mapping] Hold start for button \(buttonIndex) -> key=\(stroke.displayLabel), flags=\(flags)")
                 } else {
                     // If no keycode, fallback to sending sequence taps to stay functional
                     for stroke in keys { sendKeyStroke(stroke) }
@@ -176,7 +176,7 @@ final class ButtonMapper {
                     event.type = .flagsChanged
                     event.flags = currentModifierFlags
                     post(event)
-                    NSLog("[Mapping] Modifier hold end: button \(buttonIndex) -> \(stroke.displayLabel), cumulative flags: \(event.flags)")
+                    Log.debug("[Mapping] Modifier hold end: button \(buttonIndex) -> \(stroke.displayLabel), cumulative flags: \(event.flags)")
                 }
             }
             return
@@ -187,7 +187,7 @@ final class ButtonMapper {
                 eventUp.flags = CGEventSource.flagsState(.hidSystemState)
                 post(eventUp)
                 finishShortcut(flags)
-                NSLog("[Mapping] Hold end for button \(buttonIndex)")
+                Log.debug("[Mapping] Hold end for button \(buttonIndex)")
             }
         }
     }
