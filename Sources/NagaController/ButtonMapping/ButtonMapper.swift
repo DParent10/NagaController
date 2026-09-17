@@ -51,9 +51,25 @@ final class ButtonMapper {
     }
 
     private func finishShortcut(_ flags: CGEventFlags) {
-        for event in Self.modifierReleaseEvents(flags, physicalFlags: CGEventSource.flagsState(.hidSystemState)) {
+        for event in Self.modifierReleaseEvents(flags, physicalFlags: physicalModifierFlags) {
             post(event)
         }
+    }
+
+    /// Modifier bits that count as "held" for a mapped key. macOS tracks modifier state
+    /// per device, so a Shift held on the keyboard is not applied to a keystroke we
+    /// synthesize for a mouse button unless we merge it in ourselves (issue #22).
+    private static let passthroughModifiers: CGEventFlags = [.maskShift, .maskCommand, .maskAlternate, .maskControl, .maskSecondaryFn]
+
+    static func keyDownFlags(mapping: CGEventFlags, physical: CGEventFlags) -> CGEventFlags {
+        mapping.union(physical.intersection(passthroughModifiers))
+    }
+
+    /// Modifiers currently held on real devices. Inside this app the HID system state
+    /// reported no Shift while the keyboard's Shift was down (seen on macOS 26 with the
+    /// event tap active) whereas the combined session state did, so read both.
+    var physicalModifierFlags: CGEventFlags {
+        CGEventSource.flagsState(.hidSystemState).union(CGEventSource.flagsState(.combinedSessionState))
     }
 
     private func post(_ event: CGEvent) {
@@ -134,16 +150,16 @@ final class ButtonMapper {
                 let resolved = resolve(stroke)
                 let flags = modifierFlags(from: stroke.modifiers).union(resolved?.extraFlags ?? [])
                 if let code = resolved?.code, let eventDown = CGEvent(keyboardEventSource: keyboardSource, virtualKey: code, keyDown: true) {
-                    eventDown.flags = flags
+                    eventDown.flags = Self.keyDownFlags(mapping: flags, physical: physicalModifierFlags)
                     post(eventDown)
                     activeHolds[buttonIndex] = (code, flags)
-                    Log.debug("[Mapping] Hold start for button \(buttonIndex) -> key=\(stroke.displayLabel), flags=\(flags)")
+                    Log.debug("[Mapping] Hold start for button \(buttonIndex) -> key=\(stroke.displayLabel), flags=\(flags), sent=0x\(String(eventDown.flags.rawValue, radix: 16))")
                 } else {
                     // If no keycode, fallback to sending sequence taps to stay functional
-                    for stroke in keys { sendKeyStroke(stroke) }
+                    for stroke in keys { sendKeyStroke(stroke, withPhysicalModifiers: true) }
                 }
             } else {
-                for stroke in keys { sendKeyStroke(stroke) }
+                for stroke in keys { sendKeyStroke(stroke, withPhysicalModifiers: true) }
             }
         default:
             perform(action: action)
@@ -197,7 +213,7 @@ final class ButtonMapper {
         switch action {
         case .keySequence(let keys, _):
             for stroke in keys {
-                sendKeyStroke(stroke)
+                sendKeyStroke(stroke, withPhysicalModifiers: true)
             }
         case .application(let path, _):
             NSWorkspace.shared.open(URL(fileURLWithPath: path))
@@ -265,7 +281,7 @@ final class ButtonMapper {
         if let e = keyUp?.cgEvent { post(e) }
     }
 
-    private func sendKeyStroke(_ stroke: KeyStroke) {
+    private func sendKeyStroke(_ stroke: KeyStroke, withPhysicalModifiers: Bool = false) {
         // Map simple keys (letters) to key codes; limited for Phase 1
         guard let resolved = resolve(stroke) else { return }
         let keyCode = resolved.code
@@ -273,7 +289,9 @@ final class ButtonMapper {
 
         // Key down
         if let eventDown = CGEvent(keyboardEventSource: keyboardSource, virtualKey: keyCode, keyDown: true) {
-            eventDown.flags = flags
+            eventDown.flags = withPhysicalModifiers
+                ? Self.keyDownFlags(mapping: flags, physical: physicalModifierFlags)
+                : flags
             post(eventDown)
         }
         // Key up
