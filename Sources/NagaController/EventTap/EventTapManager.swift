@@ -198,19 +198,21 @@ final class EventTapManager {
     }
 
     private func deferMappedPointer(type: CGEventType, event: CGEvent) -> Bool {
-        guard ConfigManager.shared.getRemappingEnabled() else { return false }
-        let bindings = ConfigManager.shared.hardwareBindingsForCurrentProfile()
+        // Cheap type checks first: this runs for every event the tap sees, including
+        // keystrokes, and the bindings lookup builds a dictionary.
         let kind: PointerInputRouter.Kind
         if type == .otherMouseDown || type == .otherMouseUp || type == .otherMouseDragged {
             let usage = UInt32(event.getIntegerValueField(.mouseEventButtonNumber) + 1)
             if type == .otherMouseDragged { return activePointerButtons[usage] != nil }
-            guard bindings.values.contains(where: { $0.usagePage == 9 && $0.usage == usage }) else { return false }
+            guard ConfigManager.shared.getRemappingEnabled(),
+                  hasPointerBinding(usagePage: 9, usage: usage) else { return false }
             kind = .button(usage: usage, down: type == .otherMouseDown)
         } else if type == .scrollWheel {
             guard event.getIntegerValueField(.scrollWheelEventIsContinuous) == 0,
                   event.getIntegerValueField(.scrollWheelEventDeltaAxis2) != 0,
                   event.getIntegerValueField(.scrollWheelEventDeltaAxis1) == 0,
-                  bindings.values.contains(where: { $0.usagePage == 12 && $0.usage == 568 }) else { return false }
+                  ConfigManager.shared.getRemappingEnabled(),
+                  hasPointerBinding(usagePage: 12, usage: 568) else { return false }
             kind = .horizontalScroll
         } else { return false }
 
@@ -255,6 +257,11 @@ final class EventTapManager {
             }
         }
         return true
+    }
+
+    private func hasPointerBinding(usagePage: UInt32, usage: UInt32) -> Bool {
+        ConfigManager.shared.hardwareBindingsForCurrentProfile().values
+            .contains { $0.usagePage == usagePage && $0.usage == usage }
     }
 
     private func promptForInputMonitoring() {

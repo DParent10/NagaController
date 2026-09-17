@@ -137,10 +137,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let hasImage = (button.image != nil)
         let profile = ConfigManager.shared.currentProfileName
         if let lvl = level {
-            button.title = hasImage ? "" : "🖱️"
+            button.title = (hasImage ? " " : "🖱️ ") + "\(lvl)% · \(profile)"
             button.toolTip = "Naga battery: \(lvl)% · Profile: \(profile)"
         } else {
-            button.title = hasImage ? "" : "🖱️"
+            button.title = (hasImage ? " " : "🖱️ ") + profile
             button.toolTip = "Naga battery: — · Profile: \(profile)"
         }
     }
