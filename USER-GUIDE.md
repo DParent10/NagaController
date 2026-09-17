@@ -75,9 +75,15 @@ If all you want from the DPI buttons is browser Back and Forward, assign **Mouse
 
 Razer's [button mapping instructions](https://mysupport.razer.com/app/answers/detail/a_id/6400/) mention keeping Synapse running. On the tested mouse the on-board assignments kept working over Bluetooth with Synapse closed, but check the behavior on your own mouse and firmware before relying on it.
 
+## Scroll wheel tilt and wheel click
+
+The mapping window has a **Wheel** card with three slots: **Wheel Tilt Left**, **Wheel Tilt Right** and **Wheel Click**. They start unpaired because tilt and click report differently per mouse. Click **Configure** on a slot, then **Learn Hardware Trigger…**, then tilt or click the wheel once. Choose an action and save. Once paired, the native scroll or click is suppressed and only your action runs, one action per tilt.
+
+If tilting does nothing during learning, check the mouse's on-board profile in Razer Synapse: tilt must be assigned to **Scroll Left** and **Scroll Right**. Some profiles leave tilt on Scroll Up/Down, and then a tilt is indistinguishable from rolling the wheel, so it cannot be learned. NagaController cannot change that assignment itself.
+
 ## Learn Hardware Trigger for other mice
 
-**Learn Hardware Trigger…** is not limited to the DPI buttons. Any button card can learn a trigger from any mouse whose buttons send a distinct signal, which is how NagaController can support Razer mice other than the Naga. It works best when the button sends a keystroke; buttons that send only a mouse click can currently be learned for the DPI Up and DPI Down cards, but not for the twelve side button cards. Clear a learned trigger with the small ⓧ next to the **Trigger:** label.
+**Learn Hardware Trigger…** is not limited to the DPI and wheel slots. Any button card can learn a trigger from any mouse whose buttons send a distinct signal, whether a keystroke or an extra mouse button, which is how NagaController can support Razer mice other than the Naga. Clear a learned trigger with the small ⓧ next to the **Trigger:** label.
 
 ## Updates and saved settings
 
@@ -90,5 +96,7 @@ tccutil reset Accessibility com.example.NagaController && tccutil reset ListenEv
 ```
 
 A green permission label alone does not confirm that button interception is working: test a mapped button on selected text.
+
+To see per-event diagnostics, launch with `NAGA_DEBUG` set (the README's troubleshooting section has the exact command). A normal launch only logs permission and error state.
 
 The app does not set up login startup automatically.
