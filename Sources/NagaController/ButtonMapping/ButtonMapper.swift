@@ -15,7 +15,8 @@ final class ButtonMapper {
     }
 
     // Track active press-and-hold mappings (buttonIndex -> (keyCode, flags))
-    private var activeHolds: [Int: (CGKeyCode, CGEventFlags)] = [:]
+    // buttonIndex -> (keyCode, flags sent on the key-down, the mapping's own modifiers)
+    private var activeHolds: [Int: (code: CGKeyCode, sent: CGEventFlags, mapping: CGEventFlags)] = [:]
     
     // Track standalone modifiers held by mouse buttons (buttonIndex -> modifier flag)
     private var activeModifiers: [Int: CGEventFlags] = [:]
@@ -150,10 +151,11 @@ final class ButtonMapper {
                 let resolved = resolve(stroke)
                 let flags = modifierFlags(from: stroke.modifiers).union(resolved?.extraFlags ?? [])
                 if let code = resolved?.code, let eventDown = CGEvent(keyboardEventSource: keyboardSource, virtualKey: code, keyDown: true) {
-                    eventDown.flags = Self.keyDownFlags(mapping: flags, physical: physicalModifierFlags)
+                    let sent = Self.keyDownFlags(mapping: flags, physical: physicalModifierFlags)
+                    eventDown.flags = sent
                     post(eventDown)
-                    activeHolds[buttonIndex] = (code, flags)
-                    Log.debug("[Mapping] Hold start for button \(buttonIndex) -> key=\(stroke.displayLabel), flags=\(flags), sent=0x\(String(eventDown.flags.rawValue, radix: 16))")
+                    activeHolds[buttonIndex] = (code, sent, flags)
+                    Log.debug("[Mapping] Hold start for button \(buttonIndex) -> key=\(stroke.displayLabel), flags=\(flags), sent=0x\(String(sent.rawValue, radix: 16))")
                 } else {
                     // If no keycode, fallback to sending sequence taps to stay functional
                     for stroke in keys { sendKeyStroke(stroke, withPhysicalModifiers: true) }
@@ -199,11 +201,14 @@ final class ButtonMapper {
             return
         }
         
-        if let (keyCode, flags) = activeHolds.removeValue(forKey: buttonIndex) {
-            if let eventUp = CGEvent(keyboardEventSource: keyboardSource, virtualKey: keyCode, keyDown: false) {
-                eventUp.flags = CGEventSource.flagsState(.hidSystemState)
+        if let hold = activeHolds.removeValue(forKey: buttonIndex) {
+            if let eventUp = CGEvent(keyboardEventSource: keyboardSource, virtualKey: hold.code, keyDown: false) {
+                // Mirror the key-down. A key-up carrying fewer modifiers than the user is
+                // physically holding makes macOS treat those modifiers as released, so the
+                // next mapped press lost a held Shift (issue #22 follow-up).
+                eventUp.flags = hold.sent
                 post(eventUp)
-                finishShortcut(flags)
+                finishShortcut(hold.mapping)
                 Log.debug("[Mapping] Hold end for button \(buttonIndex)")
             }
         }
@@ -287,16 +292,19 @@ final class ButtonMapper {
         let keyCode = resolved.code
         let flags = modifierFlags(from: stroke.modifiers).union(resolved.extraFlags)
 
+        let sent = withPhysicalModifiers
+            ? Self.keyDownFlags(mapping: flags, physical: physicalModifierFlags)
+            : flags
+
         // Key down
         if let eventDown = CGEvent(keyboardEventSource: keyboardSource, virtualKey: keyCode, keyDown: true) {
-            eventDown.flags = withPhysicalModifiers
-                ? Self.keyDownFlags(mapping: flags, physical: physicalModifierFlags)
-                : flags
+            eventDown.flags = sent
             post(eventDown)
         }
-        // Key up
+        // Key up mirrors the key-down (see handleRelease); synthetic modifiers are then
+        // released explicitly by finishShortcut.
         if let eventUp = CGEvent(keyboardEventSource: keyboardSource, virtualKey: keyCode, keyDown: false) {
-            eventUp.flags = CGEventSource.flagsState(.hidSystemState)
+            eventUp.flags = sent
             post(eventUp)
             finishShortcut(flags)
         }
