@@ -65,6 +65,14 @@ extension KeyStroke {
     }
 
     static func canonicalKeyString(for keyCode: UInt16?, characters: String?) -> String {
+        // Printable keys are recorded by the character they produced, which is what the
+        // user meant and survives keyboard-layout changes. The key-code table is only for
+        // special keys (Return, arrows, F-keys, ...), whose characters are controls or
+        // private-use code points.
+        if let chars = characters, chars.unicodeScalars.count == 1,
+           let scalar = chars.unicodeScalars.first, KeyboardLayout.isPrintable(scalar) {
+            return normalizeIdentifier(chars)
+        }
         if let code = keyCode, let primary = primaryKeyNames[code] {
             return primary
         }
