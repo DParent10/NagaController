@@ -35,6 +35,13 @@ struct PointerInputRouter {
         return observations.remove(at: index).buttonIndex
     }
 
+    /// Inputs that belong to the pointer path: auxiliary mouse buttons and horizontal pan.
+    /// They must never fall through to the key-press path, whose single-candidate fallback
+    /// ignores the pan sign and fires the opposite tilt's slot without suppressing the scroll.
+    static func isPointerInput(usagePage: UInt32, usage: UInt32) -> Bool {
+        (usagePage == 9 && usage >= 3) || (usagePage == 12 && usage == 568)
+    }
+
     static func bindingIndex(bindings: [Int: HardwareBinding], usagePage: UInt32,
                              usage: UInt32, cookie: UInt32, value: Int32,
                              vendorID: Int, productID: Int) -> Int? {

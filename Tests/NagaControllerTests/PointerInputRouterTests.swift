@@ -30,6 +30,20 @@ final class PointerInputRouterTests: XCTestCase {
         XCTAssertNil(index(value: 1, product: 999))
         XCTAssertNil(index(page: 1, usage: 56, value: 1))
     }
+    func testPointerInputsNeverFallThroughToKeyPath() {
+        XCTAssertTrue(PointerInputRouter.isPointerInput(usagePage: 12, usage: 568))
+        XCTAssertTrue(PointerInputRouter.isPointerInput(usagePage: 9, usage: 3))
+        XCTAssertFalse(PointerInputRouter.isPointerInput(usagePage: 9, usage: 1))
+        XCTAssertFalse(PointerInputRouter.isPointerInput(usagePage: 7, usage: 0x1e))
+        // Only one tilt direction learned: the other direction must not resolve to that slot.
+        let oneDirection: [Int: HardwareBinding] = [
+            15: .init(usagePage: 12, usage: 568, cookie: 896, value: -1, vendorID: 1678, productID: 181)
+        ]
+        XCTAssertEqual(PointerInputRouter.bindingIndex(bindings: oneDirection, usagePage: 12, usage: 568,
+                                                       cookie: 896, value: -1, vendorID: 1678, productID: 181), 15)
+        XCTAssertNil(PointerInputRouter.bindingIndex(bindings: oneDirection, usagePage: 12, usage: 568,
+                                                     cookie: 896, value: 1, vendorID: 1678, productID: 181))
+    }
     func testOneObservationCannotTriggerTwice() {
         var router = PointerInputRouter()
         router.record(.init(kind: .horizontalScroll, timestamp: 100_000_000, buttonIndex: 7))

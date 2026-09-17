@@ -172,6 +172,9 @@ final class HIDListener {
                 Log.debug("[Pointer] HID observed slot=\(index) page=\(usagePage) usage=\(usage) value=\(activeVal)")
                 return
             }
+            // An unbound pointer input (e.g. the tilt direction that wasn't learned) stays
+            // native; it is not a candidate for the key-press path below.
+            if PointerInputRouter.isPointerInput(usagePage: usagePage, usage: usage) { return }
 
             // Support dynamic mappings for non-keyboard pages
             let buttonIndex = HIDListener.buttonIndex(forUsage: usage, usagePage: usagePage, cookie: UInt32(cookie), value: activeVal, vendorID: vendor, productID: productID)
@@ -361,12 +364,6 @@ final class HIDListener {
             if usage == 0x02 { return 14 }
         }
 
-        // Manual fallback for DPI buttons if not yet mapped in config
-        if usagePage == 0x0C && usage == 0x238 {
-            if value == 1 { return 13 }
-            if value == -1 { return 14 }
-        }
-        
         // Page 0x07 (Keyboard) fallback for standard number keys if not in config
         if usagePage == 0x07 {
             switch usage {
