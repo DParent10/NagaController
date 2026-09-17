@@ -18,9 +18,11 @@ final class KeyboardLayoutTests: XCTestCase {
         // Physical key code 7 is "x" on QWERTY; on Dvorak the same position types "q".
         XCTAssertEqual(KeyStroke.canonicalKeyString(for: 7, characters: "q"), "q")
         XCTAssertEqual(KeyStroke.canonicalKeyString(for: 7, characters: "x"), "x")
-        // Special keys still come from the table.
+        // Special keys still come from the table. Several aliases share a code
+        // ("left" / "left arrow"), so check the identifier resolves back to the code.
         XCTAssertEqual(KeyStroke.canonicalKeyString(for: UInt16(kVK_Return), characters: "\r"), "return")
-        XCTAssertEqual(KeyStroke.canonicalKeyString(for: UInt16(kVK_LeftArrow), characters: "\u{F702}"), "left")
+        let arrow = KeyStroke.canonicalKeyString(for: UInt16(kVK_LeftArrow), characters: "\u{F702}")
+        XCTAssertEqual(KeyStroke.keyCode(for: arrow), UInt16(kVK_LeftArrow), arrow)
     }
 
     func testCurrentLayoutResolvesLetters() throws {
