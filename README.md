@@ -60,23 +60,26 @@ See the [user guide](USER-GUIDE.md) for shortcuts, profile switching, Hypershift
 ## Troubleshooting
 
 1. Grant Accessibility permissions (System Settings → Privacy & Security → Accessibility) and ensure the app is checked
-2. Launch from Terminal to see diagnostics (launch through `open`; running the binary directly makes macOS kill the app on its first Bluetooth access):
+2. Launch from Terminal with verbose tracing to see diagnostics (launch through `open`; running the binary directly makes macOS kill the app on its first Bluetooth access). Per-event logs only print when `NAGA_DEBUG` is set:
    ```bash
-   open --stdout /tmp/naga.log --stderr /tmp/naga.log ./NagaController.app && tail -f /tmp/naga.log
+   open --env NAGA_DEBUG=1 --stdout /tmp/naga.log --stderr /tmp/naga.log /Applications/NagaController.app && tail -f /tmp/naga.log
    ```
 3. Turn ON "Enable remapping" in the menu bar popover
 4. Expected logs:
    - Startup:
-     - `[HID] Listener started (vendors: 0x68e, 0x1532; plus product contains 'naga')`
-     - `[HID] Device matched: vendor=0x68e, product=Naga V2 HS` (your device may vary)
+     - `[Permissions] Accessibility trusted = true`
+     - `[HID] Listener started. VERSION: ...` (if you see `IOHIDManagerOpen failed` instead, Input Monitoring is missing)
+     - `[HID] DISCOVERY: [...] product=Naga V2 HS, vendor=0x68e, ...` (your device may vary)
+     - `[EventTap] Starting with listenOnly=false` with no `CRITICAL` line after it
    - On side-button press:
-     - `[HID] Press recorded: vendor=0x..., product=..., usage=0x1e, buttonIndex=1` (etc.)
-   - On keyboard safety (non-Naga):
-     - `[HID] Ignored keyboard usage from device: vendor=0x..., product=...`
+     - `[HID] Mapped Keyboard press for button 1` followed by `[EventTap] Detected Naga button 1` (etc.)
+   - On a paired wheel tilt or click:
+     - `[Pointer] HID observed slot=15 ...` followed by `[Pointer] Suppressed native pan; performed slot=15`
 5. If mouse buttons still type digits instead of your mapping:
    - Ensure remapping is enabled
-   - Verify the Accessibility permission is granted
-   - Paste the relevant `[HID] Device matched` and `[HID] Press recorded` lines into an issue so we can whitelist your device if needed
+   - Verify both Accessibility and Input Monitoring are granted, then quit and reopen the app
+   - If the mouse was customised in Razer Synapse on Windows, reset its on-board profile there first (see the user guide)
+   - Paste the relevant `[HID] DISCOVERY` and `[HID] Mapped` lines into an issue so we can whitelist your device if needed
 
 ## Battery (Bluetooth)
 

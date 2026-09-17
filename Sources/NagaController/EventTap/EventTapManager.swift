@@ -10,6 +10,13 @@ final class EventTapManager {
 
     // Track buttons whose original number keyDown we intercepted so we can also intercept keyUp
     private var activeDownButtons: Set<Int> = []
+    private var pointerGeneration = 0
+    private var activePointerButtons: [UInt32: Int] = [:]
+
+    // One physical wheel tilt emits a burst of pan reports. Reports arriving
+    // within this gap belong to the same gesture, so one tilt performs one action.
+    private var lastPanTimestamp: [Int: UInt64] = [:]
+    private static let panGestureGapNanos: UInt64 = 150_000_000
     
     private var learningCallback: ((CGKeyCode) -> Void)?
 
@@ -87,6 +94,10 @@ final class EventTapManager {
     }
 
     func stop() {
+        pointerGeneration += 1
+        for index in activePointerButtons.values { ButtonMapper.shared.handleRelease(buttonIndex: index) }
+        activePointerButtons.removeAll()
+        lastPanTimestamp.removeAll()
         if let tap = eventTap {
             CGEvent.tapEnable(tap: tap, enable: false)
         }
@@ -119,6 +130,10 @@ final class EventTapManager {
         // Events we synthesized ourselves must never be re-interpreted as Naga presses.
         if event.getIntegerValueField(.eventSourceUserData) == ButtonMapper.syntheticEventTag {
             return Unmanaged.passUnretained(event)
+        }
+
+        if !manager.isListeningOnly, manager.deferMappedPointer(type: type, event: event) {
+            return nil
         }
 
         // Only handle remapping/blocking logic for keyboard events
@@ -180,6 +195,73 @@ final class EventTapManager {
         }
 
         return Unmanaged.passUnretained(event)
+    }
+
+    private func deferMappedPointer(type: CGEventType, event: CGEvent) -> Bool {
+        // Cheap type checks first: this runs for every event the tap sees, including
+        // keystrokes, and the bindings lookup builds a dictionary.
+        let kind: PointerInputRouter.Kind
+        if type == .otherMouseDown || type == .otherMouseUp || type == .otherMouseDragged {
+            let usage = UInt32(event.getIntegerValueField(.mouseEventButtonNumber) + 1)
+            if type == .otherMouseDragged { return activePointerButtons[usage] != nil }
+            guard ConfigManager.shared.getRemappingEnabled(),
+                  hasPointerBinding(usagePage: 9, usage: usage) else { return false }
+            kind = .button(usage: usage, down: type == .otherMouseDown)
+        } else if type == .scrollWheel {
+            guard event.getIntegerValueField(.scrollWheelEventIsContinuous) == 0,
+                  event.getIntegerValueField(.scrollWheelEventDeltaAxis2) != 0,
+                  event.getIntegerValueField(.scrollWheelEventDeltaAxis1) == 0,
+                  ConfigManager.shared.getRemappingEnabled(),
+                  hasPointerBinding(usagePage: 12, usage: 568) else { return false }
+            kind = .horizontalScroll
+        } else { return false }
+
+        guard let original = event.copy() else { return false }
+        let generation = pointerGeneration
+        // HID and CGEvent callbacks run on this same loop. Sleeping here prevents
+        // HID from arriving. Defer briefly instead and replay unmatched input.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.025) { [weak self] in
+            guard let self else { return }
+            func replay() {
+                original.setIntegerValueField(.eventSourceUserData, value: ButtonMapper.syntheticEventTag)
+                original.post(tap: .cgSessionEventTap)
+            }
+            guard generation == self.pointerGeneration, !self.isListeningOnly,
+                  ConfigManager.shared.getRemappingEnabled() else { replay(); return }
+            let matched = HIDListener.shared.consumePointer(kind: kind, timestamp: original.timestamp)
+            switch kind {
+            case .button(let usage, let down):
+                if down, let index = matched {
+                    guard self.activePointerButtons[usage] == nil else { return }
+                    self.activePointerButtons[usage] = index
+                    ButtonMapper.shared.handlePress(buttonIndex: index)
+                    Log.debug("[Pointer] Suppressed native button down; performed slot=\(index)")
+                } else if !down, let index = self.activePointerButtons.removeValue(forKey: usage) {
+                    ButtonMapper.shared.handleRelease(buttonIndex: index)
+                    Log.debug("[Pointer] Suppressed native button up; released slot=\(index)")
+                } else { replay() }
+            case .horizontalScroll:
+                guard let index = matched else { replay(); return }
+                let now = original.timestamp
+                if let previous = self.lastPanTimestamp[index],
+                   now >= previous, now - previous < Self.panGestureGapNanos {
+                    // Same tilt still streaming. Swallow it: acting again would
+                    // repeat the action, replaying it would scroll the page.
+                    self.lastPanTimestamp[index] = now
+                    return
+                }
+                self.lastPanTimestamp[index] = now
+                ButtonMapper.shared.handlePress(buttonIndex: index)
+                ButtonMapper.shared.handleRelease(buttonIndex: index)
+                Log.debug("[Pointer] Suppressed native pan; performed slot=\(index)")
+            }
+        }
+        return true
+    }
+
+    private func hasPointerBinding(usagePage: UInt32, usage: UInt32) -> Bool {
+        ConfigManager.shared.hardwareBindingsForCurrentProfile().values
+            .contains { $0.usagePage == usagePage && $0.usage == usage }
     }
 
     private func promptForInputMonitoring() {

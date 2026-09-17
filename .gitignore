@@ -72,3 +72,8 @@ dmg-assets/temp.dmg
 
 # Ignore built binaries
 dist/
+
+# Local working directories: diagnostic logs, pre-change backups, packaged app
+build/
+work/
+backups/

@@ -1,0 +1,321 @@
+{
+  "profiles" : {
+    "Default" : {
+      "buttons" : {
+        "1" : {
+          "description" : "Copy",
+          "keys" : [
+            {
+              "key" : "c",
+              "modifiers" : [
+                "cmd"
+              ]
+            }
+          ],
+          "type" : "keySequence"
+        },
+        "2" : {
+          "description" : "Paste",
+          "keys" : [
+            {
+              "key" : "v",
+              "modifiers" : [
+                "cmd"
+              ]
+            }
+          ],
+          "type" : "keySequence"
+        }
+      }
+    },
+    "Naga Productivity" : {
+      "buttons" : {
+        "1" : {
+          "description" : "Copy",
+          "keys" : [
+            {
+              "key" : "c",
+              "modifiers" : [
+                "cmd"
+              ]
+            }
+          ],
+          "type" : "keySequence"
+        },
+        "10" : {
+          "description" : "New Tab",
+          "keys" : [
+            {
+              "key" : "t",
+              "modifiers" : [
+                "cmd"
+              ]
+            }
+          ],
+          "type" : "keySequence"
+        },
+        "11" : {
+          "description" : "Close Tab or Window",
+          "keys" : [
+            {
+              "key" : "w",
+              "modifiers" : [
+                "cmd"
+              ]
+            }
+          ],
+          "type" : "keySequence"
+        },
+        "12" : {
+          "description" : "Hypershift (Toggle)",
+          "mode" : "toggle",
+          "type" : "hypershift"
+        },
+        "2" : {
+          "description" : "Paste",
+          "keys" : [
+            {
+              "key" : "v",
+              "modifiers" : [
+                "cmd"
+              ]
+            }
+          ],
+          "type" : "keySequence"
+        },
+        "3" : {
+          "description" : "Undo",
+          "keys" : [
+            {
+              "key" : "z",
+              "modifiers" : [
+                "cmd"
+              ]
+            }
+          ],
+          "type" : "keySequence"
+        },
+        "4" : {
+          "description" : "Back",
+          "keys" : [
+            {
+              "key" : "[",
+              "modifiers" : [
+                "cmd"
+              ]
+            }
+          ],
+          "type" : "keySequence"
+        },
+        "5" : {
+          "description" : "Screenshot to Clipboard",
+          "keys" : [
+            {
+              "key" : "4",
+              "modifiers" : [
+                "cmd",
+                "ctrl",
+                "shift"
+              ]
+            }
+          ],
+          "type" : "keySequence"
+        },
+        "6" : {
+          "description" : "Forward",
+          "keys" : [
+            {
+              "key" : "]",
+              "modifiers" : [
+                "cmd"
+              ]
+            }
+          ],
+          "type" : "keySequence"
+        },
+        "7" : {
+          "description" : "Previous Tab",
+          "keys" : [
+            {
+              "key" : "tab",
+              "modifiers" : [
+                "ctrl",
+                "shift"
+              ]
+            }
+          ],
+          "type" : "keySequence"
+        },
+        "8" : {
+          "description" : "Next Tab",
+          "keys" : [
+            {
+              "key" : "tab",
+              "modifiers" : [
+                "ctrl"
+              ]
+            }
+          ],
+          "type" : "keySequence"
+        },
+        "9" : {
+          "description" : "Switch to Last App",
+          "keys" : [
+            {
+              "key" : "tab",
+              "keyCode" : 48,
+              "modifiers" : [
+                "cmd"
+              ]
+            }
+          ],
+          "type" : "keySequence"
+        }
+      },
+      "hardwareBindings" : {
+        "7" : {
+          "cookie" : 896,
+          "productID" : 181,
+          "usage" : 568,
+          "usagePage" : 12,
+          "value" : -1,
+          "vendorID" : 1678
+        },
+        "8" : {
+          "cookie" : 896,
+          "productID" : 181,
+          "usage" : 568,
+          "usagePage" : 12,
+          "value" : 1,
+          "vendorID" : 1678
+        },
+        "9" : {
+          "cookie" : 24,
+          "productID" : 181,
+          "usage" : 3,
+          "usagePage" : 9,
+          "value" : 1,
+          "vendorID" : 1678
+        }
+      },
+      "hypershiftMappings" : {
+        "1" : {
+          "description" : "Cut",
+          "keys" : [
+            {
+              "key" : "x",
+              "modifiers" : [
+                "cmd"
+              ]
+            }
+          ],
+          "type" : "keySequence"
+        },
+        "10" : {
+          "description" : "Reopen Closed Tab",
+          "keys" : [
+            {
+              "key" : "t",
+              "modifiers" : [
+                "cmd",
+                "shift"
+              ]
+            }
+          ],
+          "type" : "keySequence"
+        },
+        "11" : {
+          "description" : "New Window",
+          "keys" : [
+            {
+              "key" : "n",
+              "modifiers" : [
+                "cmd"
+              ]
+            }
+          ],
+          "type" : "keySequence"
+        },
+        "2" : {
+          "description" : "Paste and Match Style",
+          "keys" : [
+            {
+              "key" : "v",
+              "modifiers" : [
+                "cmd",
+                "opt",
+                "shift"
+              ]
+            }
+          ],
+          "type" : "keySequence"
+        },
+        "3" : {
+          "description" : "Redo",
+          "keys" : [
+            {
+              "key" : "z",
+              "modifiers" : [
+                "cmd",
+                "shift"
+              ]
+            }
+          ],
+          "type" : "keySequence"
+        },
+        "4" : {
+          "description" : "Previous Window in Current App",
+          "keys" : [
+            {
+              "key" : "`",
+              "modifiers" : [
+                "cmd",
+                "shift"
+              ]
+            }
+          ],
+          "type" : "keySequence"
+        },
+        "5" : {
+          "description" : "Spotlight",
+          "keys" : [
+            {
+              "key" : "space",
+              "modifiers" : [
+                "cmd"
+              ]
+            }
+          ],
+          "type" : "keySequence"
+        },
+        "6" : {
+          "description" : "Next Window in Current App",
+          "keys" : [
+            {
+              "key" : "`",
+              "modifiers" : [
+                "cmd"
+              ]
+            }
+          ],
+          "type" : "keySequence"
+        },
+        "7" : {
+          "mediaKey" : 1,
+          "type" : "mediaKey"
+        },
+        "8" : {
+          "mediaKey" : 16,
+          "type" : "mediaKey"
+        },
+        "9" : {
+          "mediaKey" : 0,
+          "type" : "mediaKey"
+        }
+      }
+    }
+  },
+  "settings" : {
+    "currentProfile" : "Naga Productivity"
+  }
+}

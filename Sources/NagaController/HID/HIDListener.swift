@@ -16,6 +16,16 @@ final class HIDListener {
     // Increased to account for scheduling/processing latency between HID and event tap
     private let recentWindow: TimeInterval = 1.00
     private var syntheticStates: [Int: Bool] = [:]
+    private var pointerRouter = PointerInputRouter()
+    private static let timebase: mach_timebase_info_data_t = {
+        var info = mach_timebase_info_data_t()
+        mach_timebase_info(&info)
+        return info
+    }()
+
+    func consumePointer(kind: PointerInputRouter.Kind, timestamp: UInt64) -> Int? {
+        pointerRouter.consume(kind: kind, timestamp: timestamp)
+    }
     
     private var learningCallback: ((UInt32, UInt32, IOHIDElementCookie, Int32, Int, Int) -> Void)?
 
@@ -44,7 +54,7 @@ final class HIDListener {
             guard context != nil else { return }
             let vendor = HIDListener.vendorID(device: device) ?? -1
             let product = (IOHIDDeviceGetProperty(device, kIOHIDProductKey as CFString) as? String) ?? "<unknown>"
-            NSLog("[HID] Device plugged/matched: vendor=0x\(String(vendor, radix: 16)), product=\(product)")
+            Log.debug("[HID] Device plugged/matched: vendor=0x\(String(vendor, radix: 16)), product=\(product)")
         }, UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()))
 
         IOHIDManagerRegisterInputValueCallback(manager, { context, result, sender, value in
@@ -64,8 +74,8 @@ final class HIDListener {
         if openResult != kIOReturnSuccess {
             NSLog("[HID] IOHIDManagerOpen failed: \(openResult)")
         } else {
-            NSLog("[HID] Listener started. VERSION: \(HIDListener.DIAGNOSTIC_VERSION)")
-            NSLog("[HID] Matching ALL devices for diagnostics + RAW reports enabled.")
+            Log.debug("[HID] Listener started. VERSION: \(HIDListener.DIAGNOSTIC_VERSION)")
+            Log.debug("[HID] Matching ALL devices for diagnostics + RAW reports enabled.")
             if let set = IOHIDManagerCopyDevices(manager) {
                 let devices = (set as NSSet) as! Set<IOHIDDevice>
                 for dev in devices {
@@ -75,7 +85,7 @@ final class HIDListener {
                     let usage = (IOHIDDeviceGetProperty(dev, kIOHIDPrimaryUsageKey as CFString) as? Int) ?? -1
                     let usagePage = (IOHIDDeviceGetProperty(dev, kIOHIDPrimaryUsagePageKey as CFString) as? Int) ?? -1
                     let ptr = Unmanaged.passUnretained(dev).toOpaque()
-                    NSLog("[HID] DISCOVERY: [\(ptr)] product=\(product), vendor=0x\(String(vendor, radix: 16)), usage=0x\(String(usagePage, radix: 16)):0x\(String(usage, radix: 16))")
+                    Log.debug("[HID] DISCOVERY: [\(ptr)] product=\(product), vendor=0x\(String(vendor, radix: 16)), usage=0x\(String(usagePage, radix: 16)):0x\(String(usage, radix: 16))")
                 }
             }
         }
@@ -148,6 +158,24 @@ final class HIDListener {
             }
             if isLearning { return }
 
+            // Mouse clicks and pan require the pointer event tap, not the number-key
+            // path. Record releases too; they must never leak through to Chrome.
+            if let index = PointerInputRouter.bindingIndex(
+                bindings: ConfigManager.shared.hardwareBindingsForCurrentProfile(),
+                usagePage: usagePage, usage: usage, cookie: UInt32(cookie), value: activeVal,
+                vendorID: vendor, productID: productID) {
+                let ticks = IOHIDValueGetTimeStamp(value)
+                let nanos = UInt64(Double(ticks) * Double(Self.timebase.numer) / Double(Self.timebase.denom))
+                let kind: PointerInputRouter.Kind = usagePage == 9
+                    ? .button(usage: usage, down: pressedValue != 0) : .horizontalScroll
+                pointerRouter.record(.init(kind: kind, timestamp: nanos, buttonIndex: index))
+                Log.debug("[Pointer] HID observed slot=\(index) page=\(usagePage) usage=\(usage) value=\(activeVal)")
+                return
+            }
+            // An unbound pointer input (e.g. the tilt direction that wasn't learned) stays
+            // native; it is not a candidate for the key-press path below.
+            if PointerInputRouter.isPointerInput(usagePage: usagePage, usage: usage) { return }
+
             // Support dynamic mappings for non-keyboard pages
             let buttonIndex = HIDListener.buttonIndex(forUsage: usage, usagePage: usagePage, cookie: UInt32(cookie), value: activeVal, vendorID: vendor, productID: productID)
             
@@ -210,7 +238,7 @@ final class HIDListener {
         queue.sync { syntheticStates[buttonIndex] = pressed }
 
         if pressed {
-            NSLog("[HID] Synthetic press captured for button \(buttonIndex) (raw=0x\(String(rawValue, radix: 16)))")
+            Log.debug("[HID] Synthetic press captured for button \(buttonIndex) (raw=0x\(String(rawValue, radix: 16)))")
             if ConfigManager.shared.getRemappingEnabled() {
                 ButtonMapper.shared.handlePress(buttonIndex: buttonIndex)
             }
@@ -275,7 +303,7 @@ final class HIDListener {
                 #if DEBUG
                 let bytes = UnsafeBufferPointer(start: report, count: length)
                 let hex = bytes.map { String(format: "%02x", $0) }.joined(separator: " ")
-                NSLog("[HID] RAW REPORT: [ID=\(id)] Len=\(length), Data=\(hex)")
+                Log.debug("[HID] RAW REPORT: [ID=\(id)] Len=\(length), Data=\(hex)")
                 #endif
             }
         }
@@ -336,12 +364,6 @@ final class HIDListener {
             if usage == 0x02 { return 14 }
         }
 
-        // Manual fallback for DPI buttons if not yet mapped in config
-        if usagePage == 0x0C && usage == 0x238 {
-            if value == 1 { return 13 }
-            if value == -1 { return 14 }
-        }
-        
         // Page 0x07 (Keyboard) fallback for standard number keys if not in config
         if usagePage == 0x07 {
             switch usage {
