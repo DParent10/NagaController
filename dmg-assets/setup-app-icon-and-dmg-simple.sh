@@ -67,6 +67,11 @@ rm -rf AppIcon.iconset
 echo ""
 echo "🎨 Creating DMG with custom background..."
 
+# Strip Finder metadata first: the icon install above can leave extended attributes on
+# the bundle, and codesign refuses them ("resource fork, Finder information, or similar
+# detritus not allowed").
+xattr -cr "$APP_BUNDLE"
+
 # Sign the app first
 codesign --force --deep --sign "Developer ID Application: Devin Parent (SUT6Y24T2J)" --options runtime "$APP_BUNDLE"
 
