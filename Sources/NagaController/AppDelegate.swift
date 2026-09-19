@@ -92,6 +92,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if let profileObserver { NotificationCenter.default.removeObserver(profileObserver) }
     }
 
+    // Called when the already-running app is "opened" again — double-clicking it in
+    // Finder, clicking a Dock icon, `open /Applications/NagaController.app`. Without this,
+    // re-opening does nothing visible after the one-time first-launch popover has already
+    // fired, which reads as "the app doesn't open."
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        NSApp.activate(ignoringOtherApps: true)
+        if let fallbackWindow {
+            fallbackWindow.makeKeyAndOrderFront(nil)
+        } else if !popover.isShown {
+            togglePopover(nil)
+        }
+        return true
+    }
+
     private func verifyStatusItemVisibleOrFallback() {
         if statusItem.isVisible, let button = statusItem.button, button.window?.isVisible == true {
             // The item is genuinely on screen. Show the popover once per install so
