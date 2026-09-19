@@ -6,6 +6,37 @@ A macOS menu bar app to remap the 12 side buttons of the Razer Naga V2 Hyperspee
 
 **[⬇️ Download Latest Release (v0.2.2)](https://github.com/DParent10/NagaController/releases/latest)**
 
+## Changes on this branch (`feature/quality-of-life`, built on v0.2.2)
+
+Not yet part of an upstream release. Builds on `fix/menubar-item-not-visible` (also in this fork).
+
+**Reliability**
+- The menu bar icon has been observed to silently fail to render — reproduced even on the
+  official notarized v0.2.2 release, with plenty of free menu bar space — and AppKit's own
+  visibility checks can't reliably detect the failure either. Rather than keep guessing at
+  the cause, the app now always runs with a Dock icon and shows a real window on launch and
+  on reopen, independent of whether the menu bar item renders. The status item is still
+  created as a convenience for the (more common) case where it works.
+- Fixed the app's own dev-build signing to use a stable local certificate instead of
+  ad-hoc, so a rebuild no longer silently revokes Accessibility/Input Monitoring grants.
+- Fixed stale cached device state (DPI baseline, in-flight button presses) surviving a
+  Bluetooth disconnect/reconnect — it previously only ever reset on app launch, despite
+  the user guide's claim that reconnecting also recalibrates it.
+
+**Quality of life**
+- **Launch at Login** — a checkbox in the main window (`SMAppService`, no helper app).
+- **Remap-enable nudge** — once both permissions are granted, offers to turn remapping on
+  immediately, instead of leaving that as an easy-to-forget separate step.
+- **Test button** in the mapping editor — runs an action once, immediately, without saving
+  or physically pressing the mouse button.
+- **Hypershift on-screen cue** — a brief HUD when Hypershift toggles, since its state was
+  already documented as easy to lose track of.
+- **Update check** — checks GitHub once a day and shows a banner if a newer release
+  exists. No auto-download or auto-install.
+- **Import warning** — flags profiles that contain shell-command actions before importing
+  them, since a shared `profiles.json` could otherwise silently bind a mouse button to
+  arbitrary shell code.
+
 ## Features
 
 - Remap Naga side buttons 1–12 to:
