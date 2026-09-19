@@ -24,6 +24,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // Start Bluetooth battery monitoring (BLE Battery Service 0x180F)
         BatteryMonitor.shared.start()
 
+        // Fire-and-forget: at most once a day, posts a notification if a newer release
+        // exists. No auto-update, just visibility.
+        UpdateChecker.shared.checkIfNeeded()
+
         // Status bar item (variable length to show %). This is a bonus, convenient path
         // to the popover — but its rendering has been observed to silently fail even with
         // an autosaveName set and free space in the menu bar (see upstream #9 and #11),
