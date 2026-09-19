@@ -9,7 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var profileObserver: NSObjectProtocol?
     private var didAlertLowBattery = false
     private var useEmojiInStatus = false
-    private var fallbackWindow: NSWindow?
+    private var mainWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Ensure Accessibility permissions
@@ -24,12 +24,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // Start Bluetooth battery monitoring (BLE Battery Service 0x180F)
         BatteryMonitor.shared.start()
 
-        // Status bar item (variable length to show %)
+        // Status bar item (variable length to show %). This is a bonus, convenient path
+        // to the popover — but its rendering has been observed to silently fail even with
+        // an autosaveName set and free space in the menu bar (see upstream #9 and #11),
+        // and AppKit's own visibility flags (`isVisible`, `button.window?.isVisible`)
+        // don't reliably reflect that failure either. Reachability must not depend on
+        // this succeeding: the Dock icon and main window below are the guaranteed way in.
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        // A stable autosaveName lets AppKit persist/restore this item's slot across
-        // launches instead of treating it as a brand-new, position-less item every time,
-        // which is the leading theory (see upstream #9 and #11) for why the item can
-        // silently fail to render even when the menu bar has free space.
         statusItem.autosaveName = "NagaController.statusItem"
         if let button = statusItem.button {
             if let icon = NSImage(named: "MenuBar") {
@@ -74,13 +75,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         updateStatusItemBattery(level: BatteryMonitor.shared.batteryLevel)
 
-        // The status item can silently fail to render — seen even with plenty of free
-        // space in the menu bar, not just a full one. Check on every launch (not only the
-        // first) and guarantee access via a real window if it's genuinely not on screen,
-        // rather than relying on a one-shot alert that only ever fires once per install.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            self?.verifyStatusItemVisibleOrFallback()
-        }
+        // The app now always runs with a Dock icon (see Info.plist) instead of trying to
+        // detect whether the status item rendered and guessing at a fallback. Show the
+        // main window on launch so there's something on screen immediately, and rely on
+        // the Dock icon for every future launch/reopen.
+        showMainWindow()
 
         // Start event tap based on persisted setting
         let remapEnabled = ConfigManager.shared.getRemappingEnabled()
@@ -92,45 +91,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if let profileObserver { NotificationCenter.default.removeObserver(profileObserver) }
     }
 
-    // Called when the already-running app is "opened" again — double-clicking it in
-    // Finder, clicking a Dock icon, `open /Applications/NagaController.app`. Without this,
-    // re-opening does nothing visible after the one-time first-launch popover has already
-    // fired, which reads as "the app doesn't open."
+    // Double-clicking the Dock icon, re-opening from Finder, or `open`-ing the app again
+    // while it's already running should always bring the window back. This is the
+    // guaranteed way in — it does not depend on the menu bar icon having rendered.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        NSApp.activate(ignoringOtherApps: true)
-        if let fallbackWindow {
-            fallbackWindow.makeKeyAndOrderFront(nil)
-        } else if !popover.isShown {
-            togglePopover(nil)
-        }
+        showMainWindow()
         return true
     }
 
-    private func verifyStatusItemVisibleOrFallback() {
-        if statusItem.isVisible, let button = statusItem.button, button.window?.isVisible == true {
-            // The item is genuinely on screen. Show the popover once per install so
-            // first-time users know where the app lives.
-            let firstLaunchKey = "NagaController.didShowFirstLaunchPopover"
-            if !UserDefaults.standard.bool(forKey: firstLaunchKey) {
-                UserDefaults.standard.set(true, forKey: firstLaunchKey)
-                NSApp.activate(ignoringOtherApps: true)
-                if !popover.isShown {
-                    togglePopover(nil)
-                }
-            }
+    private func showMainWindow() {
+        NSApp.activate(ignoringOtherApps: true)
+        if let mainWindow {
+            mainWindow.makeKeyAndOrderFront(nil)
             return
         }
-        // The status item didn't make it onto the menu bar. A process with no Dock icon
-        // and no visible menu bar item has no reliable surface to present modal UI on, so
-        // don't just show an alert and hope — guarantee a way in with a real window.
-        activateFallbackWindow()
-    }
-
-    private func activateFallbackWindow() {
-        NSLog("[MenuBar] Status item not visible after launch; opening fallback window.")
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-
         let controller = MainViewController()
         let window = NSWindow(contentViewController: controller)
         window.title = "NagaController"
@@ -138,15 +112,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.isReleasedWhenClosed = false
         window.center()
         window.delegate = self
-        fallbackWindow = window
+        mainWindow = window
         window.makeKeyAndOrderFront(nil)
-
-        let alert = NSAlert()
-        alert.messageText = "NagaController's menu bar icon didn't appear"
-        alert.informativeText = "This can happen even when the menu bar has free space. Use this window instead — it stays reachable from the Dock while it's open, and NagaController goes back to running quietly in the background once you close it."
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
     }
 
     @objc private func togglePopover(_ sender: Any?) {
@@ -192,9 +159,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
-        guard let window = notification.object as? NSWindow, window === fallbackWindow else { return }
-        fallbackWindow = nil
-        NSApp.setActivationPolicy(.accessory)
+        guard let window = notification.object as? NSWindow, window === mainWindow else { return }
+        mainWindow = nil
     }
 
     private func requestNotificationAuthorizationIfPossible() {
