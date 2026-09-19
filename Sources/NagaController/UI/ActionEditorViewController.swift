@@ -151,6 +151,7 @@ final class ActionEditorViewController: NSViewController {
     // saved and closed the editor. Suspend the equivalents while the box has focus.
     private var saveButton: NSButton!
     private var cancelButton: NSButton!
+    private var testButton: NSButton!
 
     init(buttonIndex: Int, initialLayer: Int = 0, onComplete: @escaping () -> Void) {
         self.buttonIndex = buttonIndex
@@ -387,6 +388,14 @@ final class ActionEditorViewController: NSViewController {
         UIStyle.stylePrimaryButton(saveButton)
         saveButton.widthAnchor.constraint(equalToConstant: 100).isActive = true
         saveButton.heightAnchor.constraint(equalToConstant: 36).isActive = true
+
+        testButton = NSButton(title: "Test", target: self, action: #selector(testTapped))
+        testButton.image = UIStyle.symbol("play.fill", size: 12, weight: .bold)
+        testButton.imagePosition = .imageLeading
+        testButton.toolTip = "Run this action once, right now, without pressing the mouse button"
+        UIStyle.styleSecondaryButton(testButton)
+        testButton.widthAnchor.constraint(equalToConstant: 90).isActive = true
+        testButton.heightAnchor.constraint(equalToConstant: 36).isActive = true
         
         learnButton.target = self
         learnButton.action = #selector(learnHardwareTapped)
@@ -420,6 +429,7 @@ final class ActionEditorViewController: NSViewController {
         hardwareRow.spacing = 8
         hardwareStack.widthAnchor.constraint(equalTo: hardwareRow.widthAnchor).isActive = true
 
+        buttonsStack.addArrangedSubview(testButton)
         buttonsStack.addArrangedSubview(NSView()) // Spacer
         buttonsStack.addArrangedSubview(cancelButton)
         buttonsStack.addArrangedSubview(saveButton)
@@ -626,6 +636,14 @@ final class ActionEditorViewController: NSViewController {
     @objc private func cancelTapped() {
         dismiss(self)
         onComplete()
+    }
+
+    @objc private func testTapped() {
+        guard let action = buildActionFromUI() else {
+            NSSound.beep()
+            return
+        }
+        ButtonMapper.shared.test(action: action)
     }
 
     @objc private func saveTapped() {
