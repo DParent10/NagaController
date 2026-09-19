@@ -1,4 +1,5 @@
 import Cocoa
+import ServiceManagement
 
 final class MainViewController: NSViewController {
     private let titleLabel: NSTextField = {
@@ -24,6 +25,15 @@ final class MainViewController: NSViewController {
     private let batteryGlass = GlassyBatteryView()
 
     private let toggle = NSButton(checkboxWithTitle: "Enable remapping (blocks original keys)", target: nil, action: nil)
+    private let launchAtLoginToggle = NSButton(checkboxWithTitle: "Launch at login", target: nil, action: nil)
+    private let updateBanner: NSButton = {
+        let b = NSButton(title: "", target: nil, action: nil)
+        b.isBordered = false
+        b.font = .systemFont(ofSize: 11, weight: .semibold)
+        b.contentTintColor = UIStyle.razerGreen
+        b.isHidden = true
+        return b
+    }()
     private let configureButton: NSButton = {
         let b = NSButton(title: "Configure mappings…", target: nil, action: nil)
         b.image = UIStyle.symbol("slider.horizontal.3", size: 14, weight: .semibold)
@@ -42,6 +52,7 @@ final class MainViewController: NSViewController {
 
     private var batteryObserver: NSObjectProtocol?
     private var permissionObserver: NSObjectProtocol?
+    private var updateObserver: NSObjectProtocol?
 
     private let permissionHeaderLabel: NSTextField = {
         let label = NSTextField(labelWithString: "Permissions")
@@ -104,11 +115,14 @@ final class MainViewController: NSViewController {
         batteryGlass.widthAnchor.constraint(equalToConstant: 60).isActive = true
         batteryGlass.heightAnchor.constraint(equalToConstant: 12).isActive = true
 
-        let headerStack = NSStackView(views: [titleLabel, statusLabel, batteryRow])
+        updateBanner.target = self
+        updateBanner.action = #selector(openReleasesPage)
+
+        let headerStack = NSStackView(views: [titleLabel, statusLabel, batteryRow, updateBanner])
         headerStack.orientation = .vertical
         headerStack.spacing = 8
         headerStack.alignment = .centerX
-        
+
         container.addArrangedSubview(headerStack)
 
         // 2. Actions Section (in a card)
@@ -143,8 +157,20 @@ final class MainViewController: NSViewController {
         toggleContainer.edgeInsets = NSEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
         (toggle.cell as? NSButtonCell)?.wraps = true
         toggleContainer.widthAnchor.constraint(lessThanOrEqualToConstant: 230).isActive = true
-        
+
+        launchAtLoginToggle.target = self
+        launchAtLoginToggle.action = #selector(launchAtLoginChanged(_:))
+        launchAtLoginToggle.state = (SMAppService.mainApp.status == .enabled) ? .on : .off
+        launchAtLoginToggle.font = .systemFont(ofSize: 13, weight: .medium)
+        launchAtLoginToggle.contentTintColor = .white
+
+        let launchAtLoginContainer = NSStackView(views: [launchAtLoginToggle])
+        launchAtLoginContainer.alignment = .centerX
+        launchAtLoginContainer.edgeInsets = NSEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
+        launchAtLoginContainer.widthAnchor.constraint(lessThanOrEqualToConstant: 230).isActive = true
+
         actionsStack.addArrangedSubview(toggleContainer)
+        actionsStack.addArrangedSubview(launchAtLoginContainer)
         actionsStack.addArrangedSubview(configureButton)
         actionsStack.addArrangedSubview(quitButton)
         
@@ -194,6 +220,11 @@ final class MainViewController: NSViewController {
             self?.refreshPermissionStatuses()
         }
         refreshPermissionStatuses()
+
+        updateObserver = NotificationCenter.default.addObserver(forName: UpdateChecker.didFindUpdateNotification, object: nil, queue: .main) { [weak self] note in
+            self?.showUpdateBanner(version: note.object as? String)
+        }
+        showUpdateBanner(version: UpdateChecker.shared.availableVersion)
     }
 
     @objc private func toggleChanged(_ sender: NSButton) {
@@ -202,6 +233,33 @@ final class MainViewController: NSViewController {
         statusLabel.stringValue = enabled ? "Remapping active" : "Listen-only mode"
         statusLabel.textColor = .white
         ConfigManager.shared.setRemappingEnabled(enabled)
+    }
+
+    @objc private func launchAtLoginChanged(_ sender: NSButton) {
+        let enabled = (sender.state == .on)
+        do {
+            if enabled, SMAppService.mainApp.status != .enabled {
+                try SMAppService.mainApp.register()
+            } else if !enabled, SMAppService.mainApp.status == .enabled {
+                try SMAppService.mainApp.unregister()
+            }
+        } catch {
+            NSLog("[LoginItem] Failed to \(enabled ? "enable" : "disable") launch at login: \(error.localizedDescription)")
+            sender.state = enabled ? .off : .on
+        }
+    }
+
+    @objc private func openReleasesPage() {
+        NSWorkspace.shared.open(UpdateChecker.releasesPageURL)
+    }
+
+    private func showUpdateBanner(version: String?) {
+        guard let version else {
+            updateBanner.isHidden = true
+            return
+        }
+        updateBanner.title = "Update available: v\(version)"
+        updateBanner.isHidden = false
     }
 
     @objc private func openMappings() {
@@ -229,8 +287,34 @@ final class MainViewController: NSViewController {
     }
 
     func refreshPermissionStatuses() {
-        updateStatus(label: accessibilityStatusLabel, granted: PermissionManager.shared.hasAccessibilityPermission())
-        updateStatus(label: inputmonitoringStatusLabel, granted: PermissionManager.shared.hasInputMonitoringPermission())
+        let accessibilityGranted = PermissionManager.shared.hasAccessibilityPermission()
+        let inputMonitoringGranted = PermissionManager.shared.hasInputMonitoringPermission()
+        updateStatus(label: accessibilityStatusLabel, granted: accessibilityGranted)
+        updateStatus(label: inputmonitoringStatusLabel, granted: inputMonitoringGranted)
+
+        if accessibilityGranted && inputMonitoringGranted {
+            promptToEnableRemappingIfNeeded()
+        }
+    }
+
+    // Both permissions granted has never meant remapping is actually on — that's a
+    // separate switch, and forgetting to flip it reads as "the app doesn't do anything"
+    // (it did, twice, in testing). Nudge once per install rather than nagging forever.
+    private func promptToEnableRemappingIfNeeded() {
+        let nudgeKey = "NagaController.didNudgeEnableRemapping"
+        guard !ConfigManager.shared.getRemappingEnabled(), !UserDefaults.standard.bool(forKey: nudgeKey) else { return }
+        UserDefaults.standard.set(true, forKey: nudgeKey)
+
+        let alert = NSAlert()
+        alert.messageText = "Turn on remapping?"
+        alert.informativeText = "Accessibility and Input Monitoring are both granted. Saved button mappings only take effect once remapping is switched on."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Turn On")
+        alert.addButton(withTitle: "Not Now")
+        if alert.runModal() == .alertFirstButtonReturn {
+            toggle.state = .on
+            toggleChanged(toggle)
+        }
     }
 
     private func updateStatus(label: NSTextField, granted: Bool) {
@@ -294,6 +378,9 @@ final class MainViewController: NSViewController {
             NotificationCenter.default.removeObserver(obs)
         }
         if let obs = permissionObserver {
+            NotificationCenter.default.removeObserver(obs)
+        }
+        if let obs = updateObserver {
             NotificationCenter.default.removeObserver(obs)
         }
     }

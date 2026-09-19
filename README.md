@@ -15,7 +15,11 @@ A macOS menu bar app to remap the 12 side buttons of the Razer Naga V2 Hyperspee
   - Profile switching
 - Toggle remapping ON/OFF from the menu bar
 - Configure mappings in a dedicated window
+- Test a mapping instantly from the editor, without pressing the physical button
 - Battery percentage display via Bluetooth (UUID 0x180F / 0x2A19)
+- Launch at login
+- Notifies you in the app window when a newer release is available (no auto-install)
+- Warns before importing a profile that runs shell commands
 - Modern dark UI with Razer-green accents
 
 ## Requirements
