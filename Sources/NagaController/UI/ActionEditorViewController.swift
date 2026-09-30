@@ -643,7 +643,15 @@ final class ActionEditorViewController: NSViewController {
             NSSound.beep()
             return
         }
-        ButtonMapper.shared.test(action: action)
+        // A profile switch would change which profile Save writes into while the editor
+        // is still open, and a Hypershift action has nothing to run on its own.
+        switch action {
+        case .profileSwitch, .hypershift:
+            NSSound.beep()
+            return
+        default:
+            ButtonMapper.shared.test(action: action)
+        }
     }
 
     @objc private func saveTapped() {

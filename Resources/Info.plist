@@ -17,7 +17,7 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>13.0</string>
 	<key>LSUIElement</key>
-	<false/>
+	<true/>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>NagaController needs to send keyboard events for button remapping.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>

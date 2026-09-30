@@ -79,11 +79,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         updateStatusItemBattery(level: BatteryMonitor.shared.batteryLevel)
 
-        // The app now always runs with a Dock icon (see Info.plist) instead of trying to
-        // detect whether the status item rendered and guessing at a fallback. Show the
-        // main window on launch so there's something on screen immediately, and rely on
-        // the Dock icon for every future launch/reopen.
-        showMainWindow()
+        // Reachability must not depend on the status item rendering. The app stays a
+        // menu-bar app by default, but (a) the main window opens on the very first launch,
+        // (b) opening the app again while it runs (Finder, Spotlight, the Dock) always
+        // brings the window back via applicationShouldHandleReopen, and (c) a "Show icon
+        // in Dock" preference switches the activation policy for anyone who wants it.
+        AppDelegate.applyDockIconPreference()
+        let firstLaunchKey = "NagaController.didShowFirstLaunchWindow"
+        if !UserDefaults.standard.bool(forKey: firstLaunchKey) {
+            UserDefaults.standard.set(true, forKey: firstLaunchKey)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.showMainWindow()
+            }
+        }
 
         // Start event tap based on persisted setting
         let remapEnabled = ConfigManager.shared.getRemappingEnabled()
@@ -95,12 +103,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if let profileObserver { NotificationCenter.default.removeObserver(profileObserver) }
     }
 
-    // Double-clicking the Dock icon, re-opening from Finder, or `open`-ing the app again
-    // while it's already running should always bring the window back. This is the
-    // guaranteed way in — it does not depend on the menu bar icon having rendered.
+    // Opening the app again while it's running — Finder, Spotlight, `open`, or the Dock
+    // icon when enabled — always brings the window back. This is the guaranteed way in;
+    // it does not depend on the menu bar icon having rendered, and it works for
+    // accessory (LSUIElement) apps too.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         showMainWindow()
         return true
+    }
+
+    static let showDockIconKey = "NagaController.showDockIcon"
+
+    /// Applies the persisted "Show icon in Dock" preference. Default is off (menu-bar only).
+    static func applyDockIconPreference() {
+        let show = UserDefaults.standard.bool(forKey: showDockIconKey)
+        NSApp.setActivationPolicy(show ? .regular : .accessory)
     }
 
     private func showMainWindow() {

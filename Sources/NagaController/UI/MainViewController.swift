@@ -26,6 +26,7 @@ final class MainViewController: NSViewController {
 
     private let toggle = NSButton(checkboxWithTitle: "Enable remapping (blocks original keys)", target: nil, action: nil)
     private let launchAtLoginToggle = NSButton(checkboxWithTitle: "Launch at login", target: nil, action: nil)
+    private let dockIconToggle = NSButton(checkboxWithTitle: "Show icon in Dock", target: nil, action: nil)
     private let updateBanner: NSButton = {
         let b = NSButton(title: "", target: nil, action: nil)
         b.isBordered = false
@@ -169,8 +170,21 @@ final class MainViewController: NSViewController {
         launchAtLoginContainer.edgeInsets = NSEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
         launchAtLoginContainer.widthAnchor.constraint(lessThanOrEqualToConstant: 230).isActive = true
 
+        dockIconToggle.target = self
+        dockIconToggle.action = #selector(dockIconChanged(_:))
+        dockIconToggle.state = UserDefaults.standard.bool(forKey: AppDelegate.showDockIconKey) ? .on : .off
+        dockIconToggle.font = .systemFont(ofSize: 13, weight: .medium)
+        dockIconToggle.contentTintColor = .white
+        dockIconToggle.toolTip = "The app lives in the menu bar. Turn this on if the menu bar icon is hidden on your Mac, or you prefer a Dock icon."
+
+        let dockIconContainer = NSStackView(views: [dockIconToggle])
+        dockIconContainer.alignment = .centerX
+        dockIconContainer.edgeInsets = NSEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
+        dockIconContainer.widthAnchor.constraint(lessThanOrEqualToConstant: 230).isActive = true
+
         actionsStack.addArrangedSubview(toggleContainer)
         actionsStack.addArrangedSubview(launchAtLoginContainer)
+        actionsStack.addArrangedSubview(dockIconContainer)
         actionsStack.addArrangedSubview(configureButton)
         actionsStack.addArrangedSubview(quitButton)
         
@@ -247,6 +261,14 @@ final class MainViewController: NSViewController {
             NSLog("[LoginItem] Failed to \(enabled ? "enable" : "disable") launch at login: \(error.localizedDescription)")
             sender.state = enabled ? .off : .on
         }
+    }
+
+    @objc private func dockIconChanged(_ sender: NSButton) {
+        UserDefaults.standard.set(sender.state == .on, forKey: AppDelegate.showDockIconKey)
+        AppDelegate.applyDockIconPreference()
+        // Switching to .regular can leave the app inactive; bring it forward so the window
+        // and the new Dock icon are both visible immediately.
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     @objc private func openReleasesPage() {
