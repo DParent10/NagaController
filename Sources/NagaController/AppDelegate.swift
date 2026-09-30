@@ -128,6 +128,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         let controller = MainViewController()
         let window = NSWindow(contentViewController: controller)
+        // The main view is styled for a dark background (white labels on HUD material);
+        // the popover forces that, a standalone window would follow the system appearance
+        // and render unreadable in Light mode.
+        window.appearance = NSAppearance(named: .darkAqua)
         window.title = "NagaController"
         window.styleMask = [.titled, .closable, .miniaturizable]
         window.isReleasedWhenClosed = false
