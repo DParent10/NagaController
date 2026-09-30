@@ -136,6 +136,7 @@ final class ActionEditorViewController: NSViewController {
     private let clearHardwareButton = NSButton(title: "", target: nil, action: nil)
     private var isLearningHardware = false
     private var isCoolingDown = false
+    private var isTesting = false
 
     // Hypershift mode picker (hold / toggle)
     private let hypershiftModeSegmented = NSSegmentedControl(
@@ -648,7 +649,20 @@ final class ActionEditorViewController: NSViewController {
         switch action {
         case .profileSwitch, .hypershift:
             NSSound.beep()
-            return
+        case .keySequence, .textSnippet, .macro:
+            // Keystrokes go to the frontmost app, which is us while this sheet is open:
+            // they'd land in the capture box and rewrite the mapping being edited. Hand
+            // focus to the previous app, send, then come back.
+            isTesting = true
+            NSApp.hide(nil)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                ButtonMapper.shared.test(action: action)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                    NSApp.unhide(nil)
+                    NSApp.activate(ignoringOtherApps: true)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self?.isTesting = false }
+                }
+            }
         default:
             ButtonMapper.shared.test(action: action)
         }
@@ -730,7 +744,7 @@ final class ActionEditorViewController: NSViewController {
     private func set(mod: NSButton, from on: Bool) { mod.state = on ? .on : .off }
 
     private func capture(event: NSEvent) {
-        if isLearningHardware || isCoolingDown { return }
+        if isLearningHardware || isCoolingDown || isTesting { return }
         if event.type == .flagsChanged {
             applyModifiers(from: event.modifierFlags)
             updateKeyFieldDisplay()
