@@ -57,6 +57,12 @@ final class HIDListener {
             Log.debug("[HID] Device plugged/matched: vendor=0x\(String(vendor, radix: 16)), product=\(product)")
         }, UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()))
 
+        IOHIDManagerRegisterDeviceRemovalCallback(manager, { context, result, sender, device in
+            guard let context = context else { return }
+            let this = Unmanaged<HIDListener>.fromOpaque(context).takeUnretainedValue()
+            this.handleDeviceRemoval(device: device)
+        }, UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()))
+
         IOHIDManagerRegisterInputValueCallback(manager, { context, result, sender, value in
             guard let context = context else { return }
             let this = Unmanaged<HIDListener>.fromOpaque(context).takeUnretainedValue()
@@ -88,6 +94,25 @@ final class HIDListener {
                     Log.debug("[HID] DISCOVERY: [\(ptr)] product=\(product), vendor=0x\(String(vendor, radix: 16)), usage=0x\(String(usagePage, radix: 16)):0x\(String(usage, radix: 16))")
                 }
             }
+        }
+    }
+
+    // A Bluetooth drop, sleep/wake, or dongle reseat leaves stale per-device state behind:
+    // the DPI baseline (see handle(report:)) compares against a value from before the
+    // gap and can report a bogus direction, and a button physically held at disconnect
+    // time never gets its release event, leaving it stuck "down" forever. Reset on
+    // removal so the next connection starts clean, matching what the docs already claim
+    // happens on "launch or reconnect" but which only actually happened on launch.
+    private func handleDeviceRemoval(device: IOHIDDevice) {
+        guard HIDListener.isWhitelistedMouse(device: device) else { return }
+        let product = (IOHIDDeviceGetProperty(device, kIOHIDProductKey as CFString) as? String) ?? "<unknown>"
+        Log.debug("[HID] Device removed: product=\(product). Resetting DPI baseline and in-flight button state.")
+        lastDPI = nil
+        lastDPIDirection = 0
+        pointerRouter = PointerInputRouter()
+        queue.sync {
+            syntheticStates.removeAll()
+            recentPressTimestamps.removeAll()
         }
     }
 

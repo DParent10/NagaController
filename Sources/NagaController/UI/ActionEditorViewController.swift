@@ -136,6 +136,7 @@ final class ActionEditorViewController: NSViewController {
     private let clearHardwareButton = NSButton(title: "", target: nil, action: nil)
     private var isLearningHardware = false
     private var isCoolingDown = false
+    private var isTesting = false
 
     // Hypershift mode picker (hold / toggle)
     private let hypershiftModeSegmented = NSSegmentedControl(
@@ -151,6 +152,7 @@ final class ActionEditorViewController: NSViewController {
     // saved and closed the editor. Suspend the equivalents while the box has focus.
     private var saveButton: NSButton!
     private var cancelButton: NSButton!
+    private var testButton: NSButton!
 
     init(buttonIndex: Int, initialLayer: Int = 0, onComplete: @escaping () -> Void) {
         self.buttonIndex = buttonIndex
@@ -387,6 +389,14 @@ final class ActionEditorViewController: NSViewController {
         UIStyle.stylePrimaryButton(saveButton)
         saveButton.widthAnchor.constraint(equalToConstant: 100).isActive = true
         saveButton.heightAnchor.constraint(equalToConstant: 36).isActive = true
+
+        testButton = NSButton(title: "Test", target: self, action: #selector(testTapped))
+        testButton.image = UIStyle.symbol("play.fill", size: 12, weight: .bold)
+        testButton.imagePosition = .imageLeading
+        testButton.toolTip = "Run this action once, right now, without pressing the mouse button"
+        UIStyle.styleSecondaryButton(testButton)
+        testButton.widthAnchor.constraint(equalToConstant: 90).isActive = true
+        testButton.heightAnchor.constraint(equalToConstant: 36).isActive = true
         
         learnButton.target = self
         learnButton.action = #selector(learnHardwareTapped)
@@ -420,6 +430,7 @@ final class ActionEditorViewController: NSViewController {
         hardwareRow.spacing = 8
         hardwareStack.widthAnchor.constraint(equalTo: hardwareRow.widthAnchor).isActive = true
 
+        buttonsStack.addArrangedSubview(testButton)
         buttonsStack.addArrangedSubview(NSView()) // Spacer
         buttonsStack.addArrangedSubview(cancelButton)
         buttonsStack.addArrangedSubview(saveButton)
@@ -628,6 +639,35 @@ final class ActionEditorViewController: NSViewController {
         onComplete()
     }
 
+    @objc private func testTapped() {
+        guard let action = buildActionFromUI() else {
+            NSSound.beep()
+            return
+        }
+        // A profile switch would change which profile Save writes into while the editor
+        // is still open, and a Hypershift action has nothing to run on its own.
+        switch action {
+        case .profileSwitch, .hypershift:
+            NSSound.beep()
+        case .keySequence, .textSnippet, .macro:
+            // Keystrokes go to the frontmost app, which is us while this sheet is open:
+            // they'd land in the capture box and rewrite the mapping being edited. Hand
+            // focus to the previous app, send, then come back.
+            isTesting = true
+            NSApp.hide(nil)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                ButtonMapper.shared.test(action: action)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                    NSApp.unhide(nil)
+                    NSApp.activate(ignoringOtherApps: true)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self?.isTesting = false }
+                }
+            }
+        default:
+            ButtonMapper.shared.test(action: action)
+        }
+    }
+
     @objc private func saveTapped() {
         // Finalise the currently visible layer's UI state into temp storage
         let finalAction = buildActionFromUI()
@@ -704,7 +744,7 @@ final class ActionEditorViewController: NSViewController {
     private func set(mod: NSButton, from on: Bool) { mod.state = on ? .on : .off }
 
     private func capture(event: NSEvent) {
-        if isLearningHardware || isCoolingDown { return }
+        if isLearningHardware || isCoolingDown || isTesting { return }
         if event.type == .flagsChanged {
             applyModifiers(from: event.modifierFlags)
             updateKeyFieldDisplay()

@@ -1,7 +1,7 @@
 import Cocoa
 import UserNotifications
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var statusItem: NSStatusItem!
     private let popover = NSPopover()
     private let eventTapManager = EventTapManager.shared
@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var profileObserver: NSObjectProtocol?
     private var didAlertLowBattery = false
     private var useEmojiInStatus = false
+    private var mainWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Ensure Accessibility permissions
@@ -23,8 +24,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Start Bluetooth battery monitoring (BLE Battery Service 0x180F)
         BatteryMonitor.shared.start()
 
-        // Status bar item (variable length to show %)
+        // Fire-and-forget: at most once a day, posts a notification if a newer release
+        // exists. No auto-update, just visibility.
+        UpdateChecker.shared.checkIfNeeded()
+
+        // Status bar item (variable length to show %). This is a bonus, convenient path
+        // to the popover — but its rendering has been observed to silently fail even with
+        // an autosaveName set and free space in the menu bar (see upstream #9 and #11),
+        // and AppKit's own visibility flags (`isVisible`, `button.window?.isVisible`)
+        // don't reliably reflect that failure either. Reachability must not depend on
+        // this succeeding: the Dock icon and main window below are the guaranteed way in.
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem.autosaveName = "NagaController.statusItem"
         if let button = statusItem.button {
             if let icon = NSImage(named: "MenuBar") {
                 icon.isTemplate = true
@@ -68,14 +79,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         updateStatusItemBattery(level: BatteryMonitor.shared.batteryLevel)
 
-        // First launch: the app has no window or Dock icon, so open the popover once to
-        // show where it lives. If the status item didn't make it onto the menu bar (a full
-        // menu bar on a notched MacBook hides items), fall back to an alert.
-        let firstLaunchKey = "NagaController.didShowFirstLaunchPopover"
+        // Reachability must not depend on the status item rendering. The app stays a
+        // menu-bar app by default, but (a) the main window opens on the very first launch,
+        // (b) opening the app again while it runs (Finder, Spotlight, the Dock) always
+        // brings the window back via applicationShouldHandleReopen, and (c) a "Show icon
+        // in Dock" preference switches the activation policy for anyone who wants it.
+        AppDelegate.applyDockIconPreference()
+        let firstLaunchKey = "NagaController.didShowFirstLaunchWindow"
         if !UserDefaults.standard.bool(forKey: firstLaunchKey) {
             UserDefaults.standard.set(true, forKey: firstLaunchKey)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-                self?.showFirstLaunchHint()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.showMainWindow()
             }
         }
 
@@ -89,18 +103,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let profileObserver { NotificationCenter.default.removeObserver(profileObserver) }
     }
 
-    private func showFirstLaunchHint() {
+    // Opening the app again while it's running — Finder, Spotlight, `open`, or the Dock
+    // icon when enabled — always brings the window back. This is the guaranteed way in;
+    // it does not depend on the menu bar icon having rendered, and it works for
+    // accessory (LSUIElement) apps too.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showMainWindow()
+        return true
+    }
+
+    static let showDockIconKey = "NagaController.showDockIcon"
+
+    /// Applies the persisted "Show icon in Dock" preference. Default is off (menu-bar only).
+    static func applyDockIconPreference() {
+        let show = UserDefaults.standard.bool(forKey: showDockIconKey)
+        NSApp.setActivationPolicy(show ? .regular : .accessory)
+    }
+
+    private func showMainWindow() {
         NSApp.activate(ignoringOtherApps: true)
-        if let button = statusItem.button, button.window?.isVisible == true, !popover.isShown {
-            togglePopover(nil)
+        if let mainWindow {
+            mainWindow.makeKeyAndOrderFront(nil)
             return
         }
-        let alert = NSAlert()
-        alert.messageText = "NagaController runs in the menu bar"
-        alert.informativeText = "There is no window or Dock icon. Look for the mouse icon in the menu bar to enable remapping and configure buttons. If you don't see it, your menu bar may be full; remove or hide a few other items so it fits."
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
+        let controller = MainViewController()
+        let window = NSWindow(contentViewController: controller)
+        // The main view is styled for a dark background (white labels on HUD material);
+        // the popover forces that, a standalone window would follow the system appearance
+        // and render unreadable in Light mode.
+        window.appearance = NSAppearance(named: .darkAqua)
+        window.title = "NagaController"
+        window.styleMask = [.titled, .closable, .miniaturizable]
+        window.isReleasedWhenClosed = false
+        window.center()
+        window.delegate = self
+        mainWindow = window
+        window.makeKeyAndOrderFront(nil)
     }
 
     @objc private func togglePopover(_ sender: Any?) {
@@ -143,6 +181,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             button.title = (hasImage ? " " : "🖱️ ") + profile
             button.toolTip = "Naga battery: — · Profile: \(profile)"
         }
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow, window === mainWindow else { return }
+        mainWindow = nil
     }
 
     private func requestNotificationAuthorizationIfPossible() {

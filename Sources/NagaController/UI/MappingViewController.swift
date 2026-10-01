@@ -576,7 +576,18 @@ final class MappingViewController: NSViewController {
         p.beginSheetModal(for: view.window!) { resp in
             guard resp == .OK, let url = p.url else { return }
             do {
-                try ConfigManager.shared.importProfiles(from: url, merge: true)
+                let file = try ConfigManager.shared.loadProfilesFile(from: url)
+                let shellCount = ConfigManager.countShellCommandActions(in: file)
+                if shellCount > 0 {
+                    let alert = NSAlert()
+                    alert.messageText = "This profile runs shell commands"
+                    alert.informativeText = "\(shellCount) button\(shellCount == 1 ? "" : "s") in this file run a shell command as soon as it's pressed. Only import it if you trust where it came from."
+                    alert.alertStyle = .warning
+                    alert.addButton(withTitle: "Import Anyway")
+                    alert.addButton(withTitle: "Cancel")
+                    guard alert.runModal() == .alertFirstButtonReturn else { return }
+                }
+                ConfigManager.shared.importProfiles(file, merge: true)
                 ConfigManager.shared.saveUserProfiles()
                 self.refreshRows()
             } catch {

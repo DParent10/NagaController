@@ -217,9 +217,18 @@ final class ConfigManager {
 
     // MARK: - Import / Export
 
-    func importProfiles(from url: URL, merge: Bool = true) throws {
+    /// Decodes without applying anything, so a caller can inspect the file (e.g. warn
+    /// about shell-command actions) before committing to the import.
+    func loadProfilesFile(from url: URL) throws -> ProfilesFile {
         let data = try Data(contentsOf: url)
-        let pf = try JSONDecoder().decode(ProfilesFile.self, from: data)
+        return try JSONDecoder().decode(ProfilesFile.self, from: data)
+    }
+
+    func importProfiles(from url: URL, merge: Bool = true) throws {
+        importProfiles(try loadProfilesFile(from: url), merge: merge)
+    }
+
+    func importProfiles(_ pf: ProfilesFile, merge: Bool = true) {
         if merge {
             for (k, v) in pf.profiles { profiles[k] = v }
         } else {
@@ -230,6 +239,17 @@ final class ConfigManager {
         } else {
             ButtonMapper.shared.updateMapping(mappingForCurrentProfile())
             ButtonMapper.shared.updateHypershiftMapping(hypershiftMappingForCurrentProfile())
+        }
+    }
+
+    /// A profile bound to a shell command runs arbitrary code the moment its button is
+    /// pressed, with no per-press confirmation. A shared profiles.json (a "friend's setup"
+    /// found online) could carry one silently, so surface a count before an import commits.
+    static func countShellCommandActions(in file: ProfilesFile) -> Int {
+        file.profiles.values.reduce(0) { total, profile in
+            let standard = profile.buttons.values.filter { $0.type == "systemCommand" }.count
+            let hypershift = profile.hypershiftMappings?.values.filter { $0.type == "systemCommand" }.count ?? 0
+            return total + standard + hypershift
         }
     }
 

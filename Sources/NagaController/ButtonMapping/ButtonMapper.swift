@@ -107,6 +107,7 @@ final class ButtonMapper {
             } else if mode == .toggle {
                 isHypershiftToggled.toggle()
                 NSLog("[Mapping] Hypershift toggled to \(isHypershiftToggled) by button \(buttonIndex)")
+                HUDNotifier.shared.show(isHypershiftToggled ? "Hypershift ON" : "Hypershift OFF")
             }
             lastHypershiftPressTime = CFAbsoluteTimeGetCurrent()
             return
@@ -181,6 +182,7 @@ final class ButtonMapper {
                 if holdDuration > 0.5, isHypershiftToggled {
                     isHypershiftToggled = false
                     NSLog("[Mapping] Hypershift TOGGLE force-deactivated via long hold (\(String(format: "%.2f", holdDuration))s)")
+                    HUDNotifier.shared.show("Hypershift OFF")
                 }
             }
             return
@@ -212,6 +214,13 @@ final class ButtonMapper {
                 Log.debug("[Mapping] Hold end for button \(buttonIndex)")
             }
         }
+    }
+
+    /// Runs an action once, immediately — lets the mapping editor's "Test" button verify
+    /// a mapping (including one not yet saved) without physically pressing the mouse
+    /// button it will end up bound to.
+    func test(action: ActionType) {
+        perform(action: action)
     }
 
     private func perform(action: ActionType) {

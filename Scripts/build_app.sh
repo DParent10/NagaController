@@ -71,8 +71,23 @@ PLIST
 fi
 
 echo "Code signing..."
-# Ad-hoc codesign (helps TCC and launching)
-codesign --force --deep --sign - "$APP_BUNDLE" 2>/dev/null || true
+# Prefer a real local signing identity over ad-hoc ("-"). Ad-hoc produces a
+# fresh, content-derived identity on every build, so macOS treats each build
+# as a different app and silently revokes previously granted Accessibility /
+# Input Monitoring permissions, forcing a re-grant after every rebuild. A
+# stable identity (tied to a certificate, not the binary's hash) keeps those
+# grants across rebuilds. Override with NAGA_CODESIGN_IDENTITY if needed.
+CODESIGN_IDENTITY="${NAGA_CODESIGN_IDENTITY:-}"
+if [[ -z "$CODESIGN_IDENTITY" ]]; then
+  CODESIGN_IDENTITY="$(security find-identity -v -p codesigning 2>/dev/null | grep -m1 -oE '"[^"]+"' | tr -d '"')"
+fi
+if [[ -z "$CODESIGN_IDENTITY" ]]; then
+  echo "No local signing identity found; falling back to ad-hoc (permissions will need re-granting after every rebuild)."
+  CODESIGN_IDENTITY="-"
+else
+  echo "Signing with: $CODESIGN_IDENTITY"
+fi
+codesign --force --deep --sign "$CODESIGN_IDENTITY" "$APP_BUNDLE" 2>/dev/null || true
 
 # Remove quarantine attributes if present
 xattr -dr com.apple.quarantine "$APP_BUNDLE" 2>/dev/null || true

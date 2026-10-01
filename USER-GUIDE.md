@@ -10,6 +10,8 @@
 
 Saving a mapping does not turn remapping on. If a button still types a number, check the switch in the menu bar first. If access was just granted, restart the app.
 
+The app lives in the menu bar and has no Dock icon by default. Its window opens on the first launch, and opening NagaController again from Applications or Spotlight while it's running always brings the window back, so a hidden menu bar icon never locks you out. If you'd rather have a Dock icon, tick **Show icon in Dock** in the window. **Launch at login** is next to it.
+
 ## Before you start: reset the mouse's on-board profile
 
 The Naga stores its own button assignments in the mouse. If you ever remapped buttons in Razer Synapse on Windows, those assignments stay active over Bluetooth on the Mac and NagaController will not see the buttons it expects (a side button may type `w`, or act as a middle click). If some buttons do nothing in NagaController, connect the mouse to a Windows machine, open Synapse, reset the on-board profile to defaults, then reconnect it to the Mac. NagaController cannot change the on-board profile itself; Razer only exposes that protocol over USB, never over Bluetooth.
@@ -19,6 +21,8 @@ The Naga stores its own button assignments in the mouse. If you ever remapped bu
 Select a profile, click **Configure** on a button card, and choose the **Key** tab. Click the capture box and press the shortcut you want (for example ⌘C for Copy), or pick one from **Quick Presets…**. The presets also include bare modifier keys, so a side button can act as Shift or Command on its own. Click **Save**.
 
 The **Label / Description** field is only a label. Naming an action "Paste" does not make it paste: the shortcut must be ⌘V.
+
+**Test** runs the action once without saving or pressing the mouse button. For keystroke and text actions the app briefly steps aside so the keys go to the app you were using before, then comes back.
 
 The other tabs are **App** (open an application), **Cmd** (run a shell command), **Text** (type a snippet), **Profile** (switch profiles, see below), **macOS** (media keys, volume, brightness, Mission Control, Show Desktop) and **Hypershift** (see below).
 
