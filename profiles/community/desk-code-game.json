@@ -1,0 +1,886 @@
+{
+  "profiles": {
+    "Desk": {
+      "buttons": {
+        "1": {
+          "type": "keySequence",
+          "description": "Copy",
+          "keys": [
+            {
+              "key": "c",
+              "modifiers": [
+                "cmd"
+              ]
+            }
+          ]
+        },
+        "2": {
+          "type": "keySequence",
+          "description": "Paste",
+          "keys": [
+            {
+              "key": "v",
+              "modifiers": [
+                "cmd"
+              ]
+            }
+          ]
+        },
+        "3": {
+          "type": "keySequence",
+          "description": "Cut",
+          "keys": [
+            {
+              "key": "x",
+              "modifiers": [
+                "cmd"
+              ]
+            }
+          ]
+        },
+        "4": {
+          "type": "keySequence",
+          "description": "Undo",
+          "keys": [
+            {
+              "key": "z",
+              "modifiers": [
+                "cmd"
+              ]
+            }
+          ]
+        },
+        "5": {
+          "type": "keySequence",
+          "description": "Redo",
+          "keys": [
+            {
+              "key": "z",
+              "modifiers": [
+                "cmd",
+                "shift"
+              ]
+            }
+          ]
+        },
+        "6": {
+          "type": "keySequence",
+          "description": "Screenshot Selection to Clipboard",
+          "keys": [
+            {
+              "key": "4",
+              "modifiers": [
+                "cmd",
+                "ctrl",
+                "shift"
+              ]
+            }
+          ]
+        },
+        "7": {
+          "type": "keySequence",
+          "description": "Previous Tab",
+          "keys": [
+            {
+              "key": "tab",
+              "modifiers": [
+                "ctrl",
+                "shift"
+              ]
+            }
+          ]
+        },
+        "8": {
+          "type": "keySequence",
+          "description": "Next Tab",
+          "keys": [
+            {
+              "key": "tab",
+              "modifiers": [
+                "ctrl"
+              ]
+            }
+          ]
+        },
+        "9": {
+          "type": "hypershift",
+          "description": "Function Layer (Toggle)",
+          "mode": "toggle"
+        },
+        "10": {
+          "type": "profileSwitch",
+          "description": "Desk",
+          "profile": "Desk"
+        },
+        "11": {
+          "type": "profileSwitch",
+          "description": "Code",
+          "profile": "Code"
+        },
+        "12": {
+          "type": "profileSwitch",
+          "description": "Game",
+          "profile": "Game"
+        },
+        "15": {
+          "type": "keySequence",
+          "description": "Browser Back",
+          "keys": [
+            {
+              "key": "[",
+              "modifiers": [
+                "cmd"
+              ]
+            }
+          ]
+        },
+        "16": {
+          "type": "keySequence",
+          "description": "Browser Forward",
+          "keys": [
+            {
+              "key": "]",
+              "modifiers": [
+                "cmd"
+              ]
+            }
+          ]
+        },
+        "17": {
+          "type": "mediaKey",
+          "description": "Play or Pause",
+          "mediaKey": 16
+        }
+      },
+      "hardwareBindings": {
+        "15": {
+          "usagePage": 12,
+          "usage": 568,
+          "cookie": 896,
+          "value": -1,
+          "vendorID": 1678,
+          "productID": 181
+        },
+        "16": {
+          "usagePage": 12,
+          "usage": 568,
+          "cookie": 896,
+          "value": 1,
+          "vendorID": 1678,
+          "productID": 181
+        },
+        "17": {
+          "usagePage": 9,
+          "usage": 3,
+          "cookie": 24,
+          "value": 1,
+          "vendorID": 1678,
+          "productID": 181
+        }
+      },
+      "hypershiftMappings": {
+        "1": {
+          "type": "keySequence",
+          "description": "Paste and Match Style",
+          "keys": [
+            {
+              "key": "v",
+              "modifiers": [
+                "cmd",
+                "opt",
+                "shift"
+              ]
+            }
+          ]
+        },
+        "2": {
+          "type": "keySequence",
+          "description": "Find in Page",
+          "keys": [
+            {
+              "key": "f",
+              "modifiers": [
+                "cmd"
+              ]
+            }
+          ]
+        },
+        "3": {
+          "type": "keySequence",
+          "description": "Close Tab or Window",
+          "keys": [
+            {
+              "key": "w",
+              "modifiers": [
+                "cmd"
+              ]
+            }
+          ]
+        },
+        "4": {
+          "type": "keySequence",
+          "description": "Switch Apps",
+          "keys": [
+            {
+              "key": "tab",
+              "modifiers": [
+                "cmd"
+              ]
+            }
+          ]
+        },
+        "5": {
+          "type": "keySequence",
+          "description": "Previous Window",
+          "keys": [
+            {
+              "key": "`",
+              "modifiers": [
+                "cmd",
+                "shift"
+              ]
+            }
+          ]
+        },
+        "6": {
+          "type": "keySequence",
+          "description": "Next Window",
+          "keys": [
+            {
+              "key": "`",
+              "modifiers": [
+                "cmd"
+              ]
+            }
+          ]
+        },
+        "7": {
+          "type": "mediaKey",
+          "description": "Volume Down",
+          "mediaKey": 1
+        },
+        "8": {
+          "type": "mediaKey",
+          "description": "Volume Up",
+          "mediaKey": 0
+        },
+        "10": {
+          "type": "profileSwitch",
+          "description": "Desk",
+          "profile": "Desk"
+        },
+        "11": {
+          "type": "profileSwitch",
+          "description": "Code",
+          "profile": "Code"
+        },
+        "12": {
+          "type": "profileSwitch",
+          "description": "Game",
+          "profile": "Game"
+        },
+        "15": {
+          "type": "mediaKey",
+          "description": "Previous Track",
+          "mediaKey": 18
+        },
+        "16": {
+          "type": "mediaKey",
+          "description": "Next Track",
+          "mediaKey": 17
+        },
+        "17": {
+          "type": "mediaKey",
+          "description": "Mute",
+          "mediaKey": 7
+        }
+      }
+    },
+    "Code": {
+      "buttons": {
+        "1": {
+          "type": "keySequence",
+          "description": "Copy",
+          "keys": [
+            {
+              "key": "c",
+              "modifiers": [
+                "cmd"
+              ]
+            }
+          ]
+        },
+        "2": {
+          "type": "keySequence",
+          "description": "Paste",
+          "keys": [
+            {
+              "key": "v",
+              "modifiers": [
+                "cmd"
+              ]
+            }
+          ]
+        },
+        "3": {
+          "type": "keySequence",
+          "description": "Cut",
+          "keys": [
+            {
+              "key": "x",
+              "modifiers": [
+                "cmd"
+              ]
+            }
+          ]
+        },
+        "4": {
+          "type": "keySequence",
+          "description": "Undo",
+          "keys": [
+            {
+              "key": "z",
+              "modifiers": [
+                "cmd"
+              ]
+            }
+          ]
+        },
+        "5": {
+          "type": "keySequence",
+          "description": "Redo",
+          "keys": [
+            {
+              "key": "z",
+              "modifiers": [
+                "cmd",
+                "shift"
+              ]
+            }
+          ]
+        },
+        "6": {
+          "type": "keySequence",
+          "description": "Save",
+          "keys": [
+            {
+              "key": "s",
+              "modifiers": [
+                "cmd"
+              ]
+            }
+          ]
+        },
+        "7": {
+          "type": "keySequence",
+          "description": "Command Palette",
+          "keys": [
+            {
+              "key": "p",
+              "modifiers": [
+                "cmd",
+                "shift"
+              ]
+            }
+          ]
+        },
+        "8": {
+          "type": "keySequence",
+          "description": "Search Workspace",
+          "keys": [
+            {
+              "key": "f",
+              "modifiers": [
+                "cmd",
+                "shift"
+              ]
+            }
+          ]
+        },
+        "9": {
+          "type": "hypershift",
+          "description": "Function Layer (Toggle)",
+          "mode": "toggle"
+        },
+        "10": {
+          "type": "profileSwitch",
+          "description": "Desk",
+          "profile": "Desk"
+        },
+        "11": {
+          "type": "profileSwitch",
+          "description": "Code",
+          "profile": "Code"
+        },
+        "12": {
+          "type": "profileSwitch",
+          "description": "Game",
+          "profile": "Game"
+        },
+        "15": {
+          "type": "keySequence",
+          "description": "Go Back",
+          "keys": [
+            {
+              "key": "[",
+              "modifiers": [
+                "cmd"
+              ]
+            }
+          ]
+        },
+        "16": {
+          "type": "keySequence",
+          "description": "Go Forward",
+          "keys": [
+            {
+              "key": "]",
+              "modifiers": [
+                "cmd"
+              ]
+            }
+          ]
+        },
+        "17": {
+          "type": "mediaKey",
+          "description": "Play or Pause",
+          "mediaKey": 16
+        }
+      },
+      "hardwareBindings": {
+        "15": {
+          "usagePage": 12,
+          "usage": 568,
+          "cookie": 896,
+          "value": -1,
+          "vendorID": 1678,
+          "productID": 181
+        },
+        "16": {
+          "usagePage": 12,
+          "usage": 568,
+          "cookie": 896,
+          "value": 1,
+          "vendorID": 1678,
+          "productID": 181
+        },
+        "17": {
+          "usagePage": 9,
+          "usage": 3,
+          "cookie": 24,
+          "value": 1,
+          "vendorID": 1678,
+          "productID": 181
+        }
+      },
+      "hypershiftMappings": {
+        "1": {
+          "type": "keySequence",
+          "description": "Paste and Match Style",
+          "keys": [
+            {
+              "key": "v",
+              "modifiers": [
+                "cmd",
+                "opt",
+                "shift"
+              ]
+            }
+          ]
+        },
+        "2": {
+          "type": "keySequence",
+          "description": "Find in File",
+          "keys": [
+            {
+              "key": "f",
+              "modifiers": [
+                "cmd"
+              ]
+            }
+          ]
+        },
+        "3": {
+          "type": "keySequence",
+          "description": "Quick Open",
+          "keys": [
+            {
+              "key": "p",
+              "modifiers": [
+                "cmd"
+              ]
+            }
+          ]
+        },
+        "4": {
+          "type": "keySequence",
+          "description": "Toggle Terminal",
+          "keys": [
+            {
+              "key": "`",
+              "modifiers": [
+                "ctrl"
+              ]
+            }
+          ]
+        },
+        "5": {
+          "type": "keySequence",
+          "description": "Source Control",
+          "keys": [
+            {
+              "key": "g",
+              "modifiers": [
+                "cmd",
+                "shift"
+              ]
+            }
+          ]
+        },
+        "6": {
+          "type": "keySequence",
+          "description": "Problems",
+          "keys": [
+            {
+              "key": "m",
+              "modifiers": [
+                "cmd",
+                "shift"
+              ]
+            }
+          ]
+        },
+        "7": {
+          "type": "keySequence",
+          "description": "Previous Editor",
+          "keys": [
+            {
+              "key": "tab",
+              "modifiers": [
+                "ctrl",
+                "shift"
+              ]
+            }
+          ]
+        },
+        "8": {
+          "type": "keySequence",
+          "description": "Next Editor",
+          "keys": [
+            {
+              "key": "tab",
+              "modifiers": [
+                "ctrl"
+              ]
+            }
+          ]
+        },
+        "10": {
+          "type": "profileSwitch",
+          "description": "Desk",
+          "profile": "Desk"
+        },
+        "11": {
+          "type": "profileSwitch",
+          "description": "Code",
+          "profile": "Code"
+        },
+        "12": {
+          "type": "profileSwitch",
+          "description": "Game",
+          "profile": "Game"
+        },
+        "15": {
+          "type": "mediaKey",
+          "description": "Previous Track",
+          "mediaKey": 18
+        },
+        "16": {
+          "type": "mediaKey",
+          "description": "Next Track",
+          "mediaKey": 17
+        },
+        "17": {
+          "type": "mediaKey",
+          "description": "Mute",
+          "mediaKey": 7
+        }
+      }
+    },
+    "Game": {
+      "buttons": {
+        "1": {
+          "type": "keySequence",
+          "description": "Ability 1",
+          "keys": [
+            {
+              "key": "1",
+              "modifiers": []
+            }
+          ]
+        },
+        "2": {
+          "type": "keySequence",
+          "description": "Ability 2",
+          "keys": [
+            {
+              "key": "2",
+              "modifiers": []
+            }
+          ]
+        },
+        "3": {
+          "type": "keySequence",
+          "description": "Ability 3",
+          "keys": [
+            {
+              "key": "3",
+              "modifiers": []
+            }
+          ]
+        },
+        "4": {
+          "type": "keySequence",
+          "description": "Ability 4",
+          "keys": [
+            {
+              "key": "4",
+              "modifiers": []
+            }
+          ]
+        },
+        "5": {
+          "type": "keySequence",
+          "description": "Ability 5",
+          "keys": [
+            {
+              "key": "5",
+              "modifiers": []
+            }
+          ]
+        },
+        "6": {
+          "type": "keySequence",
+          "description": "Ability 6",
+          "keys": [
+            {
+              "key": "6",
+              "modifiers": []
+            }
+          ]
+        },
+        "7": {
+          "type": "keySequence",
+          "description": "Ability 7",
+          "keys": [
+            {
+              "key": "7",
+              "modifiers": []
+            }
+          ]
+        },
+        "8": {
+          "type": "keySequence",
+          "description": "Ability 8",
+          "keys": [
+            {
+              "key": "8",
+              "modifiers": []
+            }
+          ]
+        },
+        "9": {
+          "type": "hypershift",
+          "description": "Function Layer (Toggle)",
+          "mode": "toggle"
+        },
+        "10": {
+          "type": "profileSwitch",
+          "description": "Desk",
+          "profile": "Desk"
+        },
+        "11": {
+          "type": "profileSwitch",
+          "description": "Code",
+          "profile": "Code"
+        },
+        "12": {
+          "type": "profileSwitch",
+          "description": "Game",
+          "profile": "Game"
+        },
+        "15": {
+          "type": "keySequence",
+          "description": "Utility Q",
+          "keys": [
+            {
+              "key": "q",
+              "modifiers": []
+            }
+          ]
+        },
+        "16": {
+          "type": "keySequence",
+          "description": "Utility E",
+          "keys": [
+            {
+              "key": "e",
+              "modifiers": []
+            }
+          ]
+        },
+        "17": {
+          "type": "keySequence",
+          "description": "Map or Inventory",
+          "keys": [
+            {
+              "key": "tab",
+              "modifiers": []
+            }
+          ]
+        }
+      },
+      "hardwareBindings": {
+        "15": {
+          "usagePage": 12,
+          "usage": 568,
+          "cookie": 896,
+          "value": -1,
+          "vendorID": 1678,
+          "productID": 181
+        },
+        "16": {
+          "usagePage": 12,
+          "usage": 568,
+          "cookie": 896,
+          "value": 1,
+          "vendorID": 1678,
+          "productID": 181
+        },
+        "17": {
+          "usagePage": 9,
+          "usage": 3,
+          "cookie": 24,
+          "value": 1,
+          "vendorID": 1678,
+          "productID": 181
+        }
+      },
+      "hypershiftMappings": {
+        "1": {
+          "type": "keySequence",
+          "description": "Function 1",
+          "keys": [
+            {
+              "key": "f1",
+              "modifiers": []
+            }
+          ]
+        },
+        "2": {
+          "type": "keySequence",
+          "description": "Function 2",
+          "keys": [
+            {
+              "key": "f2",
+              "modifiers": []
+            }
+          ]
+        },
+        "3": {
+          "type": "keySequence",
+          "description": "Function 3",
+          "keys": [
+            {
+              "key": "f3",
+              "modifiers": []
+            }
+          ]
+        },
+        "4": {
+          "type": "keySequence",
+          "description": "Function 4",
+          "keys": [
+            {
+              "key": "f4",
+              "modifiers": []
+            }
+          ]
+        },
+        "5": {
+          "type": "keySequence",
+          "description": "Function 5",
+          "keys": [
+            {
+              "key": "f5",
+              "modifiers": []
+            }
+          ]
+        },
+        "6": {
+          "type": "keySequence",
+          "description": "Function 6",
+          "keys": [
+            {
+              "key": "f6",
+              "modifiers": []
+            }
+          ]
+        },
+        "7": {
+          "type": "keySequence",
+          "description": "Function 7",
+          "keys": [
+            {
+              "key": "f7",
+              "modifiers": []
+            }
+          ]
+        },
+        "8": {
+          "type": "keySequence",
+          "description": "Function 8",
+          "keys": [
+            {
+              "key": "f8",
+              "modifiers": []
+            }
+          ]
+        },
+        "10": {
+          "type": "profileSwitch",
+          "description": "Desk",
+          "profile": "Desk"
+        },
+        "11": {
+          "type": "profileSwitch",
+          "description": "Code",
+          "profile": "Code"
+        },
+        "12": {
+          "type": "profileSwitch",
+          "description": "Game",
+          "profile": "Game"
+        },
+        "15": {
+          "type": "mediaKey",
+          "description": "Previous Track",
+          "mediaKey": 18
+        },
+        "16": {
+          "type": "mediaKey",
+          "description": "Next Track",
+          "mediaKey": 17
+        },
+        "17": {
+          "type": "mediaKey",
+          "description": "Mute",
+          "mediaKey": 7
+        }
+      }
+    }
+  },
+  "settings": {
+    "currentProfile": "Desk"
+  }
+}

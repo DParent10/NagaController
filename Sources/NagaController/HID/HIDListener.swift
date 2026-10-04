@@ -3,8 +3,20 @@ import IOKit.hid
 
 final class HIDListener {
     static let shared = HIDListener()
+    static let didUpdateDPINotification = Notification.Name("HIDListener.didUpdateDPI")
     private static let DIAGNOSTIC_VERSION = "2026-03-09-V4-MAP-DIAG"
     private var lastDPI: Int?
+
+    /// The DPI last reported by the mouse. This is display-only: NagaController does not
+    /// issue device-write commands, so it never changes the mouse's native DPI stages.
+    private(set) var currentDPI: Int? {
+        didSet {
+            guard oldValue != currentDPI else { return }
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: Self.didUpdateDPINotification, object: self)
+            }
+        }
+    }
 
     private var manager: IOHIDManager
     private let queue = DispatchQueue(label: "HIDListener.queue")
@@ -108,6 +120,7 @@ final class HIDListener {
         let product = (IOHIDDeviceGetProperty(device, kIOHIDProductKey as CFString) as? String) ?? "<unknown>"
         Log.debug("[HID] Device removed: product=\(product). Resetting DPI baseline and in-flight button state.")
         lastDPI = nil
+        currentDPI = nil
         lastDPIDirection = 0
         pointerRouter = PointerInputRouter()
         queue.sync {
@@ -324,6 +337,7 @@ final class HIDListener {
                 }
                 
                 lastDPI = currentDPI
+                self.currentDPI = currentDPI
             } else if id == 1 || id == 4 {
                 #if DEBUG
                 let bytes = UnsafeBufferPointer(start: report, count: length)
