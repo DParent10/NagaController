@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let popover = NSPopover()
     private let eventTapManager = EventTapManager.shared
     private var batteryObserver: NSObjectProtocol?
+    private var dpiObserver: NSObjectProtocol?
     private var profileObserver: NSObjectProtocol?
     private var didAlertLowBattery = false
     private var useEmojiInStatus = false
@@ -37,8 +38,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.autosaveName = "NagaController.statusItem"
         if let button = statusItem.button {
-            if let icon = NSImage(named: "MenuBar") {
+            let bundledMenuBarIcon = Bundle.main.url(forResource: "MenuBar", withExtension: "png")
+                .flatMap(NSImage.init(contentsOf:))
+            if let icon = NSImage(named: "MenuBar") ?? bundledMenuBarIcon {
                 icon.isTemplate = true
+                icon.size = NSSize(width: 18, height: 18)
                 button.image = icon
                 button.imagePosition = .imageLeading
             } else {
@@ -55,6 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             button.action = #selector(togglePopover(_:))
             button.target = self
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
 
         // Popover content
@@ -70,6 +75,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // Observe battery updates
         batteryObserver = NotificationCenter.default.addObserver(forName: BatteryMonitor.didUpdateNotification, object: nil, queue: .main) { [weak self] _ in
             self?.handleBatteryUpdate()
+        }
+        dpiObserver = NotificationCenter.default.addObserver(forName: HIDListener.didUpdateDPINotification, object: nil, queue: .main) { [weak self] _ in
+            self?.updateStatusItemBattery(level: BatteryMonitor.shared.batteryLevel)
         }
         // Initialize status item text
         profileObserver = NotificationCenter.default.addObserver(
@@ -101,6 +109,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         eventTapManager.stop()
         if let profileObserver { NotificationCenter.default.removeObserver(profileObserver) }
+        if let dpiObserver { NotificationCenter.default.removeObserver(dpiObserver) }
     }
 
     // Opening the app again while it's running — Finder, Spotlight, `open`, or the Dock
@@ -143,6 +152,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     @objc private func togglePopover(_ sender: Any?) {
         guard let button = statusItem.button else { return }
+        if NSApp.currentEvent?.type == .rightMouseUp {
+            let menu = NSMenu()
+            let configure = menu.addItem(withTitle: "Configure mappings…", action: #selector(openMappingsFromStatusMenu(_:)), keyEquivalent: "")
+            configure.target = self
+            menu.addItem(.separator())
+            let quit = menu.addItem(withTitle: "Quit NagaController", action: #selector(quitFromStatusMenu(_:)), keyEquivalent: "")
+            quit.target = self
+            if let event = NSApp.currentEvent {
+                NSMenu.popUpContextMenu(menu, with: event, for: button)
+            }
+            return
+        }
         if popover.isShown {
             popover.performClose(sender)
         } else {
@@ -151,6 +172,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         }
+    }
+
+    @objc private func openMappingsFromStatusMenu(_ sender: Any?) {
+        MappingWindowController.shared.show()
+    }
+
+    @objc private func quitFromStatusMenu(_ sender: Any?) {
+        NSApp.terminate(nil)
     }
 
     private func handleBatteryUpdate() {
@@ -174,12 +203,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         guard let button = statusItem.button else { return }
         let hasImage = (button.image != nil)
         let profile = ConfigManager.shared.currentProfileName
+        let dpi = HIDListener.shared.currentDPI.map(String.init) ?? "—"
         if let lvl = level {
-            button.title = (hasImage ? " " : "🖱️ ") + "\(lvl)% · \(profile)"
-            button.toolTip = "Naga battery: \(lvl)% · Profile: \(profile)"
+            button.title = (hasImage ? " " : "🖱️ ") + "\(lvl)% · \(dpi) · \(profile)"
+            button.toolTip = "Naga battery: \(lvl)% · DPI: \(HIDListener.shared.currentDPI.map(String.init) ?? "—") · Profile: \(profile)"
         } else {
-            button.title = (hasImage ? " " : "🖱️ ") + profile
-            button.toolTip = "Naga battery: — · Profile: \(profile)"
+            button.title = (hasImage ? " " : "🖱️ ") + "\(dpi) · \(profile)"
+            button.toolTip = "Naga battery: — · DPI: \(HIDListener.shared.currentDPI.map(String.init) ?? "—") · Profile: \(profile)"
         }
     }
 

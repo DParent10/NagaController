@@ -22,7 +22,16 @@ final class MainViewController: NSViewController {
         return label
     }()
 
-    private let batteryGlass = GlassyBatteryView()
+    private let dpiLabel: NSTextField = {
+        let label = NSTextField(labelWithString: "DPI: waiting")
+        label.font = .systemFont(ofSize: 12)
+        label.textColor = .secondaryLabelColor
+        label.toolTip = "Display only. The mouse's physical DPI buttons keep their on-board sensitivity stages."
+        return label
+    }()
+
+    private let batteryMeter = SegmentedMeterView(totalSegments: 4)
+    private let dpiMeter = SegmentedMeterView(totalSegments: 5)
 
     private let toggle = NSButton(checkboxWithTitle: "Enable remapping (blocks original keys)", target: nil, action: nil)
     private let launchAtLoginToggle = NSButton(checkboxWithTitle: "Launch at login", target: nil, action: nil)
@@ -52,6 +61,7 @@ final class MainViewController: NSViewController {
     }()
 
     private var batteryObserver: NSObjectProtocol?
+    private var dpiObserver: NSObjectProtocol?
     private var permissionObserver: NSObjectProtocol?
     private var updateObserver: NSObjectProtocol?
 
@@ -108,18 +118,28 @@ final class MainViewController: NSViewController {
         statusLabel.font = .systemFont(ofSize: 13, weight: .semibold)
         statusLabel.textColor = .white
         
-        let batteryRow = NSStackView(views: [batteryLabel, batteryGlass])
+        let batteryRow = NSStackView(views: [batteryLabel, batteryMeter])
         batteryRow.orientation = .horizontal
-        batteryRow.spacing = 8
+        batteryRow.spacing = 6
         batteryRow.alignment = .centerY
         batteryLabel.textColor = NSColor.white.withAlphaComponent(0.6)
-        batteryGlass.widthAnchor.constraint(equalToConstant: 60).isActive = true
-        batteryGlass.heightAnchor.constraint(equalToConstant: 12).isActive = true
+        batteryMeter.widthAnchor.constraint(equalToConstant: 40).isActive = true
+        batteryMeter.heightAnchor.constraint(equalToConstant: 10).isActive = true
+        batteryMeter.toolTip = "Battery charge level"
+        dpiMeter.widthAnchor.constraint(equalToConstant: 48).isActive = true
+        dpiMeter.heightAnchor.constraint(equalToConstant: 10).isActive = true
+        dpiMeter.toolTip = "DPI stage: 400, 800, 1600, 3200, 6400"
 
         updateBanner.target = self
         updateBanner.action = #selector(openReleasesPage)
 
-        let headerStack = NSStackView(views: [titleLabel, statusLabel, batteryRow, updateBanner])
+        let deviceStatusRow = NSStackView(views: [batteryRow, dpiLabel, dpiMeter])
+        deviceStatusRow.orientation = .horizontal
+        deviceStatusRow.spacing = 6
+        deviceStatusRow.alignment = .centerY
+        dpiLabel.textColor = NSColor.white.withAlphaComponent(0.6)
+
+        let headerStack = NSStackView(views: [titleLabel, statusLabel, deviceStatusRow, updateBanner])
         headerStack.orientation = .vertical
         headerStack.spacing = 8
         headerStack.alignment = .centerX
@@ -227,8 +247,12 @@ final class MainViewController: NSViewController {
 
         // Initial setup and observers
         updateBattery()
+        updateDPI()
         batteryObserver = NotificationCenter.default.addObserver(forName: BatteryMonitor.didUpdateNotification, object: nil, queue: .main) { [weak self] _ in
             self?.updateBattery()
+        }
+        dpiObserver = NotificationCenter.default.addObserver(forName: HIDListener.didUpdateDPINotification, object: nil, queue: .main) { [weak self] _ in
+            self?.updateDPI()
         }
         permissionObserver = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             self?.refreshPermissionStatuses()
@@ -297,15 +321,33 @@ final class MainViewController: NSViewController {
             batteryLabel.stringValue = "Battery: \(level)%"
             if level <= 20 {
                 batteryLabel.textColor = .systemRed
+                batteryMeter.activeColor = .systemRed
+            } else if level < 60 {
+                batteryLabel.textColor = .white.withAlphaComponent(0.6)
+                batteryMeter.activeColor = .systemYellow
             } else {
                 batteryLabel.textColor = .white.withAlphaComponent(0.6)
+                batteryMeter.activeColor = .systemGreen
             }
-            batteryGlass.level = level
+            batteryMeter.activeSegments = min(4, max(0, Int((Double(level) / 25.0).rounded(.up))))
         } else {
             batteryLabel.stringValue = "Battery: —"
             batteryLabel.textColor = .white.withAlphaComponent(0.6)
-            batteryGlass.level = nil
+            batteryMeter.activeSegments = 0
         }
+    }
+
+    private func updateDPI() {
+        if let dpi = HIDListener.shared.currentDPI {
+            dpiLabel.stringValue = "DPI: \(dpi)"
+            let stages = [400, 800, 1600, 3200, 6400]
+            dpiMeter.activeSegments = stages.lastIndex(where: { dpi >= $0 }).map { $0 + 1 } ?? 1
+        } else {
+            dpiLabel.stringValue = "DPI: waiting"
+            dpiMeter.activeSegments = 0
+        }
+        dpiMeter.activeColor = UIStyle.razerGreen
+        dpiLabel.textColor = NSColor.white.withAlphaComponent(0.6)
     }
 
     func refreshPermissionStatuses() {
@@ -397,6 +439,9 @@ final class MainViewController: NSViewController {
 
     deinit {
         if let obs = batteryObserver {
+            NotificationCenter.default.removeObserver(obs)
+        }
+        if let obs = dpiObserver {
             NotificationCenter.default.removeObserver(obs)
         }
         if let obs = permissionObserver {
